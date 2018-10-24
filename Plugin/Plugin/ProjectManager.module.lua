@@ -24,7 +24,7 @@ Constructors:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Parent.Utils);
 local Debug = Utils.new("Log", "ProjectManager: ", true);
 local ProjectSync = require(script.Parent.ProjectSync);
 

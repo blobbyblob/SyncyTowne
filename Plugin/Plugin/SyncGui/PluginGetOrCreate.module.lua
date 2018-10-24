@@ -22,7 +22,7 @@ Constructors:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "PluginGOC: ", true);
 
 local PluginGOC = Utils.new("Class", "PluginGOC");

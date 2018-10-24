@@ -5,7 +5,7 @@ Boots the plugin. To test:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Utils);
 local SyncGui = require(script.SyncGui);
 local PluginGetOrCreate = require(script.SyncGui.PluginGetOrCreate);
 local ProjectManager = require(script.ProjectManager);

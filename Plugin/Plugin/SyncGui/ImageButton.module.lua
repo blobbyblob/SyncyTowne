@@ -19,7 +19,7 @@ Constructors:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "ImageButton: ", false);
 
 local ImageButton = Utils.new("Class", "ImageButton");

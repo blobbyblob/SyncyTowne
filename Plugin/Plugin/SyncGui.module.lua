@@ -17,7 +17,7 @@ Constructors:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Parent.Utils);
 local Debug = Utils.new("Log", "SyncGui: ", true);
 local ImageButton = require(script.ImageButton);
 local ProjectSync = require(script.Parent.ProjectSync);

@@ -20,7 +20,7 @@ Constructors:
 
 --]]
 
-local Utils = require(game.ReplicatedStorage.Utils);
+local Utils = require(script.Parent.Utils);
 local Debug = Utils.new("Log", "ProjectSync: ", true);
 local TableComparisonDebug = Utils.new("Log", "ProjectSync: ", false);
 local HashModule = require(script.Hash);
@@ -593,7 +593,7 @@ function ProjectSync:_ListenForRemoteChanges()
 		while self._RemoteWatchID == id do
 			local success, pollResult = pcall(InvokeCommand, string.format("watch_poll\n%s", self._RemoteWatchID));
 			if success then
-				local mode, remoteFileName, hash = string.match(pollResult, "([^ ]+) ([^ ]*) ?([^ ]*)");
+				local mode, remoteFileName, hash = string.match(pollResult, "([^ ]+) '([^ ]*)' ?([^ ]*)");
 				if mode == "modify" and not self._Differences[remoteFileName] then
 					local localScript = GetLocalScript(self, remoteFileName);
 					if localScript and hash ~= HashSource(localScript.Source) then
@@ -643,6 +643,8 @@ end
 
 function ProjectSync.new(project)
 	local self = setmetatable({}, ProjectSync.Meta);
+	self._Differences = {};
+	self._ListOfFiles = {};
 	self._Project = project;
 	self._ChangedEvent = Instance.new("BindableEvent");
 	self._ScriptChangeEvent = Instance.new("BindableEvent");
