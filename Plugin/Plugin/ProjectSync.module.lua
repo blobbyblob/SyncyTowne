@@ -358,9 +358,13 @@ function ProjectSync:_PullRequiresFolderCreation()
 				last = s;
 			end
 		end
-		local scriptName = RemoveSuffix(last);
-		r(scriptName);
-		return r[scriptName].FoldersRequired;
+		if last then
+			local scriptName = RemoveSuffix(last);
+			r(scriptName);
+			return r[scriptName].FoldersRequired;
+		else
+			return r;
+		end
 	end
 	local pullFolders = {};
 	for i, v in pairs(self._ListOfFiles) do
@@ -589,7 +593,7 @@ function ProjectSync:_ListenForRemoteChanges()
 		while self._RemoteWatchID == id do
 			local success, pollResult = pcall(InvokeCommand, string.format("watch_poll\n%s", self._RemoteWatchID));
 			if success then
-				local mode, remoteFileName, hash = string.match(pollResult, "([^ ]+) '([^']*)' ?([^ ]*)");
+				local mode, remoteFileName, hash = string.match(pollResult, "([^ ]+) ([^ ]*) ?([^ ]*)");
 				if mode == "modify" and not self._Differences[remoteFileName] then
 					local localScript = GetLocalScript(self, remoteFileName);
 					if localScript and hash ~= HashSource(localScript.Source) then

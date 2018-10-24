@@ -152,7 +152,9 @@ function ProjectManager.Load(folder)
 		folder = game.ServerStorage:FindFirstChild("SyncyTowneData");
 	end
 	if not folder then
-		return ProjectManager.new()
+		local x = ProjectManager.new()
+		x.Projects = {};
+		return x;
 	end
 	local projects = {};
 	for i, sync in pairs(folder:GetChildren()) do

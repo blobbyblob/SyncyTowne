@@ -68,7 +68,7 @@ local function createGui(self)
 			self._ProjectManager.Projects = self._ProjectManager.Projects;
 			self.ProjectManager = self._ProjectManager;
 		end
-		local function UpdateElements()
+		function UpdateElements()
 			if self._SelectedRemote ~= "" and self._SelectedLocal then
 				local desc;
 				if not self._SelectedLocal then
@@ -336,7 +336,7 @@ function Gui:_BuildList()
 	if self._ProjectManager then
 		local scrollingFrame = self._Gui.Main.ScrollingFrame;
 		local j = 1;
-		for i, project in pairs(self._ProjectManager.Projects) do
+		for i, project in pairs(self._ProjectManager.Projects or {}) do
 			CreateListElementForProject(self, project, j).Parent = scrollingFrame;
 			j = j + 1;
 			if project == self._SelectedProject then
