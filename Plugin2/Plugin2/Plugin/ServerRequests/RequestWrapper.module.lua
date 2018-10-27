@@ -29,18 +29,23 @@ Constructors:
 local Utils = require(script.Parent.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "RequestWrapper: ", true);
 
+local function Identity(x) return x; end
+
 --A mapping of acceptable outgoing property type to a function that converts it
 --to a string.
 local REQUEST_ARG_TYPES = {
-	FilePath = function(path)
-		return path;
-	end;
+	FilePath = Identity;
+	["*"] = Identity;
+	Number = tostring;
+	Boolean = tostring;
 };
 
 --A mapping of acceptable incoming property type to a function that converts it
 --from a string to a native value.
 local RESPONSE_ARG_TYPES = {
 	["*"] = true; --This has special handling, so we don't need an implementation.
+	String = Identity;
+	Number = tonumber;
 };
 
 --[[ @brief Verifies that a definition for a command's arguments is suitable.
@@ -130,8 +135,7 @@ end
 local RequestWrapper = Utils.new("Class", "RequestWrapper");
 
 RequestWrapper._Commands = {};
-RequestWrapper.DestinationAddress = "localhost";
-RequestWrapper.DestinationPort = 605;
+RequestWrapper.DestinationAddress = "http://127.0.0.1:605";
 
 RequestWrapper.Get.Commands = "_Commands";
 
@@ -144,7 +148,7 @@ RequestWrapper.Get.Commands = "_Commands";
 	@return[2] The error string.
 --]]
 function RequestWrapper:_IssueCommand(cmd, args)
-	local url = self.DestinationAddress .. ":" .. self.DestinationPort;
+	local url = self.DestinationAddress;
 	local text = cmd .. "\n" .. args;
 	local success, response = pcall(game:GetService("HttpService"):PostAsync(url, text));
 	Debug("PostAsync(%s, %s) = %s", url, text, response);
@@ -178,8 +182,10 @@ function RequestWrapper:RegisterCommand(commandDef)
 	local name = commandDef.Name;
 	local argsDef = commandDef.Arguments;
 	local responseArgsDef = commandDef.ResponseArguments;
-	assert(ValidateArgDef(argsDef, REQUEST_ARG_TYPES));
-	assert(ValidateArgDef(responseArgsDef, RESPONSE_ARG_TYPES));
+	local result, errString = ValidateArgDef(argsDef, REQUEST_ARG_TYPES);
+	Utils.Log.Assert(result, "Invalid request arg: %s", errString);
+	local result, errString = ValidateArgDef(responseArgsDef, RESPONSE_ARG_TYPES);
+	Utils.Log.Assert(result, "Invalid response arg: %s", errString);
 	--validate the input and throw them into some sort of registry.
 	self._Commands[name] = function(args)
 		local success, argsString = ArgumentsToString(argsDef, args);
