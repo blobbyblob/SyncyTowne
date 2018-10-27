@@ -31,33 +31,41 @@ local Debug = Utils.new("Log", "RequestWrapper: ", true);
 
 --A mapping of acceptable outgoing property type to a function that converts it
 --to a string.
-local REQUEST_ARG_TYPES = {};
+local REQUEST_ARG_TYPES = {
+	FilePath = function(path)
+		return path;
+	end;
+};
 
 --A mapping of acceptable incoming property type to a function that converts it
 --from a string to a native value.
-local RESPONSE_ARG_TYPES = {};
+local RESPONSE_ARG_TYPES = {
+	["*"] = true; --This has special handling, so we don't need an implementation.
+};
 
 --[[ @brief Verifies that a definition for a command's arguments is suitable.
 
 	Primarily, this means that there are no two arguments with the same name,
 	and the types are all valid.
 
-	This function will throw if any errors occur.
-
 	@param def The definition of the arguments that this function takes.
 	@param validArgTypes A map of [valid arg types] -> [something truthy] which
 		is used to determine if an argument type is supported. Sensible choices
 		for this value are the two maps above (REQUEST_ARG_TYPES and
 		RESPONSE_ARG_TYPES).
+	@return[1] True if everything checks out.
+	@return[2] False if something isn't right.
+	@return[2] The error string.
 --]]
 local function ValidateArgDef(def, validArgTypes)
 	local names = {};
 	for i, v in pairs(def) do
-		Utils.Log.Assert(not names[v.Name], "Argument %s defined more than once", v.Name);
+		if names[v.Name] then return false, Utils.Log.Format("Argument %s defined more than once", v.Name); end
 		names[v.Name] = true;
-		Utils.Log.Assert(validArgTypes[v.Type], "Argument %s has unsupported type %s", v.Name, v.Type);
-		Utils.Log.Assert(i == #def or v.Type ~= "*", "Only final argument may be * type; got %s (index %s/%s)", v.Name, i, #def);
+		if not validArgTypes[v.Type] then return false, Utils.Log.Format("Argument %s has unsupported type %s", v.Name, v.Type); end
+		if not (i == #def or v.Type ~= "*") then return false, Utils.Log.Format("Only final argument may be * type; got %s (index %s/%s)", v.Name, i, #def); end
 	end
+	return true;
 end
 
 --[[ @brief Verifies that arguments are all correct & turns them into a string.
@@ -72,12 +80,12 @@ end
 local function ArgumentsToString(def, args)
 	local s = {};
 	for i, v in pairs(def) do
-		Utils.Log.Assert(args[v.Name], "Missing argument %s", v.Name);
+		if not args[v.Name] then return false, Utils.Log.Format("Missing argument %s", v.Name); end
 		local str = REQUEST_ARG_TYPES[v.Type](args[v.Name])
-		Utils.Log.Assert(str and type(str) == "string", "Internal error converting %s to string from type %s; got %s", args[v.Name], v.Type, str)
+		if not (str and type(str) == "string") then return false, Utils.Log.Format("Internal error converting %s to string from type %s; got %s", args[v.Name], v.Type, str); end
 		table.insert(s, str);
 	end
-	return table.concat(s, "\n");
+	return true, table.concat(s, "\n");
 end
 
 --[[ @brief Converts a block of text into distinct arguments.
@@ -103,20 +111,20 @@ local function StringToArguments(def, text)
 	end
 	local args = {};
 	for i, v in pairs(def) do
+		Debug("parsing out %t", v);
 		if v.Type ~= "*" then
 			--Consume a single line and convert it to the expected type.
 			local line = readline();
-			if not line then
-				return false, "Missing argument " .. v.Name;
-			end
+			if not line then return false, Utils.Log.Format("Missing argument %s", v.Name); end
 			local value = RESPONSE_ARG_TYPES[v.Type](line);
 			args[v.Name] = value;
 		else
 			--Consume the remainder of the string.
 			args[v.Name] = text;
+			Debug("Setting args.%s = %s", v.Name, text);
 		end
 	end
-	return args;
+	return true, args;
 end
 
 local RequestWrapper = Utils.new("Class", "RequestWrapper");
@@ -136,7 +144,11 @@ RequestWrapper.Get.Commands = "_Commands";
 	@return[2] The error string.
 --]]
 function RequestWrapper:_IssueCommand(cmd, args)
-	return game:GetService("HttpService"):PostAsync(self.DestinationAddress .. ":" .. self.DestinationPort, cmd .. "\n" .. args);
+	local url = self.DestinationAddress .. ":" .. self.DestinationPort;
+	local text = cmd .. "\n" .. args;
+	local success, response = pcall(game:GetService("HttpService"):PostAsync(url, text));
+	Debug("PostAsync(%s, %s) = %s", url, text, response);
+	return success, response;
 end
 
 --[[ @brief Registers a command so it may be sent to the server.
@@ -166,15 +178,15 @@ function RequestWrapper:RegisterCommand(commandDef)
 	local name = commandDef.Name;
 	local argsDef = commandDef.Arguments;
 	local responseArgsDef = commandDef.ResponseArguments;
-	ValidateArgDef(argsDef, REQUEST_ARG_TYPES);
-	ValidateArgDef(responseArgsDef, RESPONSE_ARG_TYPES)
+	assert(ValidateArgDef(argsDef, REQUEST_ARG_TYPES));
+	assert(ValidateArgDef(responseArgsDef, RESPONSE_ARG_TYPES));
 	--validate the input and throw them into some sort of registry.
 	self._Commands[name] = function(args)
 		local success, argsString = ArgumentsToString(argsDef, args);
 		if not success then
 			local errString = argsString;
 			Debug("Failure to send command %s due to invalid arguments: %s", name, errString);
-			return success, errString;
+			return false, errString;
 		end
 
 		--Issue the call to the server.
@@ -182,7 +194,11 @@ function RequestWrapper:RegisterCommand(commandDef)
 		if not success then
 			local errString = argsString;
 			Debug("Failure to send command %s due to HTTP failure: %s", name, errString);
-			return success, errString;
+			return false, errString;
+		end
+		if response == nil or type(response) ~= "string" then
+			Debug("_IssueCommand gave back bad value %s", response);
+			return false, Utils.Log.Format("IssueCommand returned bad value; expected string, got %s", response == nil and "nil" or type(response));
 		end
 
 		--Parse what the server provided back into table form.
@@ -190,7 +206,7 @@ function RequestWrapper:RegisterCommand(commandDef)
 		if not success then
 			local errString = argsString;
 			Debug("Failure to send command %s due to bad arguments from server: %s", name, errString);
-			return success, errString;
+			return false, errString;
 		end
 
 		return success, responseArgs;
@@ -204,7 +220,31 @@ function RequestWrapper.new()
 end
 
 function RequestWrapper.Test()
-
+	local r = RequestWrapper.new();
+	r:RegisterCommand({
+		Name = "read";
+		Arguments = {
+			{
+				Name = "File";
+				Type = "FilePath";
+			}
+		};
+		ResponseArguments = {
+			{
+				Name = "Contents";
+				Type = "*";
+			};
+		};
+	});
+	r._IssueCommand = function(_r, command, args)
+		Utils.Log.AssertEqual("self", r, _r);
+		Utils.Log.AssertEqual("self", "read", command);
+		Utils.Log.AssertEqual("self", "my-favorite-path", args);
+		return true, "hello world";
+	end
+	local success, response = assert(r.Commands.read({File = "my-favorite-path"}));
+	Utils.Log.AssertEqual("read result", true, success);
+	Utils.Log.AssertEqual("read command", "hello world", response.Contents);
 end
 
 return RequestWrapper;
