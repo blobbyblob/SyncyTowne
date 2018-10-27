@@ -49,7 +49,7 @@ class SessionTracker:
 		del self._Sessions[index]
 
 class FileWatchCommandHandler:
-	POLL_TIMEOUT = 30
+	POLL_TIMEOUT = 5
 
 	def __init__(self, root):
 		self._FileWatchST = SessionTracker(lambda t: t[0].kill())

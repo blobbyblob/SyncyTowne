@@ -27,7 +27,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "RequestWrapper: ", true);
+local Debug = Utils.new("Log", "RequestWrapper: ", false);
 
 local function Identity(x) return x; end
 
@@ -85,7 +85,7 @@ end
 local function ArgumentsToString(def, args)
 	local s = {};
 	for i, v in pairs(def) do
-		if not args[v.Name] then return false, Utils.Log.Format("Missing argument %s", v.Name); end
+		if args[v.Name] == nil then return false, Utils.Log.Format("Missing argument %s", v.Name); end
 		local str = REQUEST_ARG_TYPES[v.Type](args[v.Name])
 		if not (str and type(str) == "string") then return false, Utils.Log.Format("Internal error converting %s to string from type %s; got %s", args[v.Name], v.Type, str); end
 		table.insert(s, str);
@@ -108,9 +108,9 @@ local function StringToArguments(def, text)
 		if i then
 			line = string.sub(text, 1, i - 1);
 			text = string.sub(text, i + 1);
-		elseif #text > 0 then
+		elseif text then
 			line = text;
-			text = "";
+			text = nil;
 		end
 		return line;
 	end
@@ -120,12 +120,14 @@ local function StringToArguments(def, text)
 		if v.Type ~= "*" then
 			--Consume a single line and convert it to the expected type.
 			local line = readline();
+			Debug("Argument %s came as %s to convert to %s", v.Name, line, v.Type);
 			if not line then return false, Utils.Log.Format("Missing argument %s", v.Name); end
 			local value = RESPONSE_ARG_TYPES[v.Type](line);
 			args[v.Name] = value;
 		else
 			--Consume the remainder of the string.
 			args[v.Name] = text;
+			text = nil;
 			Debug("Setting args.%s = %s", v.Name, text);
 		end
 	end
@@ -150,8 +152,8 @@ RequestWrapper.Get.Commands = "_Commands";
 function RequestWrapper:_IssueCommand(cmd, args)
 	local url = self.DestinationAddress;
 	local text = cmd .. "\n" .. args;
-	local success, response = pcall(game:GetService("HttpService"):PostAsync(url, text));
-	Debug("PostAsync(%s, %s) = %s", url, text, response);
+	local success, response = pcall(game:GetService("HttpService").PostAsync, game:GetService("HttpService"), url, text);
+	Debug("PostAsync(%s, %s) = %s (%s)", url, text, response, success and "success" or "failure");
 	return success, response;
 end
 
@@ -215,7 +217,7 @@ function RequestWrapper:RegisterCommand(commandDef)
 			return false, errString;
 		end
 
-		return success, responseArgs;
+		return true, responseArgs;
 	end
 end
 
