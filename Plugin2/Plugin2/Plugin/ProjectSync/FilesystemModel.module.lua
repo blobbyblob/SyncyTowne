@@ -243,7 +243,48 @@ end
 --[[ @brief Compares against another FilesystemModel.
 --]]
 function FilesystemModel:Compare(other)
-	--TODO
+	local comparison = {};
+	local pseudoFolder = { Name = "<PseudoFolder>"; Type = "folder"; Children = {}};
+	local function Compare(a, b)
+		if a.Type == "folder" and b.Type == "folder" then
+			for i, v in pairs(a.Children) do
+				if b.Children[i] then
+					Compare(v, b.Children[i]);
+				else
+					--We only have the entry in `a`.
+					if v.Type == "file" then
+						table.insert(comparison, { Name = v.FullPath; Comparison = "selfOnly"; });
+					elseif v.Type == "folder" then
+						Compare(v, pseudoFolder);
+					end
+				end
+			end
+			for i, v in pairs(b.Children) do
+				if not a.Children[i] then
+					--We only have the entry in `b`.
+					if v.Type == "file" then
+						table.insert(comparison, { Name = v.FullPath; Comparison = "otherOnly"; });
+					elseif v.Type == "folder" then
+						Compare(pseudoFolder, v);
+					end
+				end
+			end
+		elseif a.Type == "file" and b.Type == "file" then
+			if a.Hash == b.Hash then
+				table.insert(comparison, { Name = a.FullPath; Comparison = "synced"; });
+			else
+				table.insert(comparison, { Name = a.FullPath; Comparison = "desynced"; });
+			end
+		elseif a.Type == "file" and b.Type == "folder" then
+			table.insert(comparison, { Name = a.FullPath; Comparison = "selfOnly"; });
+			Compare(pseudoFolder, b);
+		elseif a.Type == "folder" and b.Type == "file" then
+			table.insert(comparison, { Name = b.FullPath; Comparison = "otherOnly"; });
+			Compare(a, pseudoFolder);
+		end
+	end
+	Compare(self._Tree, other._Tree);
+	return comparison;
 end
 
 --[[ @brief Cleans up this instance.
@@ -279,18 +320,50 @@ end
 	@return The file system model.
 --]]
 function FilesystemModel.fromInstance(root)
-	--TODO
+	local tree = { Name = "<root>"; Type = "folder"; FullPath = ""; Children = {}; };
+	--Find all Scripts, ModuleScripts, or LocalScripts in root and add them to the tree.
+	local function recurse(node, path)
+		if SUFFIXES[node.ClassName] then
+			local filename = node.Name .. SUFFIXES[node.ClassName];
+			AddEntryToTree(tree, path, filename, {
+				Name = filename;
+				Type = "file";
+				Hash = tostring(string.len(node.Source));
+			});
+		end
+		path = path .. node.Name .. "/";
+		for i, v in pairs(node:GetChildren()) do
+			recurse(v, path);
+		end
+	end
+	recurse(root, "");
+	local self = FilesystemModel.new();
+	self._Tree = tree;
+	return self;
+end
+
+local function PrintTree(t, prefix)
+	prefix = prefix or "";
+	if t.Children then
+		Debug("* %s%s", prefix, t.FullPath);
+		for i, v in pairs(t.Children) do
+			PrintTree(v, prefix .. "    ");
+		end
+	else
+		Debug("* %s%s (%s)", prefix, t.FullPath, t.Hash);
+	end
 end
 
 function FilesystemModel.Test()
-	local f = FilesystemModel.fromRoot("SyncyTowne/server/testdir2");
-	wait(.3);
---	ServerRequests.write{
---		File = "SyncyTowne/server/testdir2/Folder/Script.server.lua";
---		Contents = "print('Hello, World!');";
---	};
-	wait(6);
-	f:Destroy();
+	local f1 = FilesystemModel.fromRoot("SyncyTowne/server/testdir2");
+	local f2 = FilesystemModel.fromInstance(game.ServerStorage.Folder);
+	Debug("fromRoot:")
+	PrintTree(f1.Tree);
+	Debug("fromInstance:")
+	PrintTree(f2.Tree);
+	Debug("Difference: %0t", f1:Compare(f2));
+	f1:Destroy();
+	f2:Destroy();
 end
 
 return FilesystemModel;
