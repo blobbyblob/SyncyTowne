@@ -1,33 +1,27 @@
 --[[
 
-Synchronizes a FilesystemModel & StudioModel.
+Represents a project and provides sync-across-HTTP functionality.
 
 Properties:
-	FilesystemModel (read-only): the state of the remote filesystem.
-	StudioModel (read-only): the state of the local studio DataModel.
-	RootPath (read-only): the path of this project on the file system (relative to the global root).
-	RootInstance (read-only): the reference to the root object in the studio DataModel.
-	AutoSync (boolean): when true, the project will automatically be synced when changes are detected.
-	DifferenceCount (read-only, int): the number of files which differ on the remote.
-	Differences (read-only, array): a list of files which differ on the remote compared to locally.
+	Project (read-only, table): the project definition as given by ProjectManager.
+	DifferenceCount (read-only, number): the number of scripts which are different from the remote.
+	AutoSync (read-only, boolean): whether or not the project is being auto-synced at the moment.
+	PullingWillCreateFolders (read-only, boolean|table): this will be set to false if pulling the remote logs will not result in folder creation in studio. Otherwise, it will be a table of strings representing each folder that will be created.
+	PushingWillDeleteFiles (read-only, boolean): this is set to true if pushing scripts to the remote will result in files being deleted.
 
 Events:
-	SyncStateChanged(remoteFile, studioScript, state): fires whenever the two models come unsynced.
-		remoteFile: the full path to the remote file
+	Changed(): fires when any property changes.
 
 Methods:
-	RemoveRoot(path) -> path: returns the file path with the root path trimmed off. E.g., RemoveRoot("project/foo/bar") -> "foo/bar" (if Root is "project")
-	RemoveSuffix(path) -> path, className: returns the path with any suffix trimmed. E.g., RemoveSuffix("foo.module.lua") -> "foo", "ModuleScript"
-	RemovePath(path) -> path, filename: splits off the filename given a path. E.g., RemovePath("path/to/foo") -> "path/to", "foo"
-	GetRemote(Instance) -> path: returns the remote filename for a particular Instance.
-	GetLocal(path) -> Instance: returns the local instance for a particular filename.
-	Push([ path ]): pushes DataModel state to the remote.
-		path: when provided, only the contents at this file path will be pushed.
-	Pull([ path ]): pulls remote state to the DataModel.
-		path: when provided, only the contents at this file path will be pulled.
+	CheckSync(): determines which scripts disagree with the remote. Returns a list of scripts.
+	Push(script): updates the remote's scripts with the sources from studio. If script is provided, this will be the script which is synced; otherwise, all scripts in the project are synced.
+	Pull(script): updates studio scripts with the sources from the remote. If script is provided, this will be the script which is synced; otherwise, all scripts in the project are synced.
+	SetAutoSync(value): enables/disables auto-sync. This will automatically invoke CheckSync and throw an error if DifferenceCount > 0, so it's wise to check this in advance (or pcall).
+	Iterate(): iterates over all files in this combined studio/filesystem client.
+	Destroy(): cleans up this object.
 
 Constructors:
-	new(fileRoot, studioRoot): constructs a new synchronizer using the remote root path & the studio root part.
+	new(): construct with default settings.
 
 --]]
 
