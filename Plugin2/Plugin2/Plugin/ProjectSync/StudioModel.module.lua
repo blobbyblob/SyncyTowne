@@ -5,12 +5,17 @@ Represents all "saveable" objects using Lua tables.
 Properties:
 	Root: the Instance at the root of the model.
 	Objects: all objects which can be saved. These are entries of the following form:
-		{ Object =  <object>; Hash = "<hash>"; }
+		{
+			Object = <object>;
+			Hash = "<hash>";
+			Original = <handle>; --Only for StudioModels which were constructed using fromFilesystemModel; this refers to the tree entry that created this object.
+		}
 
 Events:
 	Changed: fires when any object is added/removed, or a property is changed on any object.
 
 Methods:
+	Compare(other): compares one StudioModel to another.
 	Destroy(): cleans up this instance.
 
 Constructors:
@@ -93,6 +98,57 @@ function StudioModel:_HookUpConnections()
 	end
 end
 
+function StudioModel:Compare(other)
+	local results = {};
+	local equivalents = {[self._Root] = other._Root};
+	local function GetEquivalent(obj)
+		if not equivalents[obj] then
+			local parent = GetEquivalent(obj.Parent);
+			if parent and parent:FindFirstChild(obj.Name) then
+				equivalents[obj] = parent:FindFirstChild(obj.Name);
+			else
+				Debug("Cannot find equivalent for %s in %s", obj, parent);
+			end
+		end
+		return equivalents[obj];
+	end
+
+	--Map `other._Objects[i].Object` -> `other._Objects[i]` for all i.
+	local otherObjectsMap = {};
+	for i, v in pairs(other._Objects) do
+		otherObjectsMap[v.Object] = v;
+	end
+
+	local backConvert = {};
+	for i, v in pairs(self._Objects) do
+		local corresponding = GetEquivalent(v.Object);
+		if corresponding and otherObjectsMap[corresponding] then
+			backConvert[corresponding] = v;
+			if corresponding.ClassName == v.Object.ClassName then
+				local comparisonResult = SAVEABLE_TYPES[v.Object.ClassName](v, otherObjectsMap[corresponding]);
+				Debug("Comparing %s against %s: %s", v, otherObjectsMap[corresponding], comparisonResult);
+				if comparisonResult then
+					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "synced"; });
+				else
+					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "desynced"; });
+				end
+			else
+				table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "classMismatch"; });
+			end
+		else
+			table.insert(results, { A = v; Status = "aOnly"; });
+			Debug("Object %s in self, not other", v);
+		end
+	end
+	for i, v in pairs(other._Objects) do
+		if not backConvert[v.Object] then
+			Debug("Object %s in other, not self", v);
+			table.insert(results, { B = v; Status = "bOnly"; });
+		end
+	end
+	return results;
+end
+
 function StudioModel.new()
 	local self = setmetatable({}, StudioModel.Meta);
 	self._Objects = {};
@@ -152,7 +208,7 @@ function StudioModel.fromFilesystemModel(fm)
 		Debug("Scanning %s", tree.Name);
 		if tree.Type == "file" then
 			local class, root = GetSuffix(tree.Name);
-			local entry = { Object = SUFFIX_CONVERT_TO_OBJECT[GetSuffix(tree.Name)](); Hash = tree.Hash; };
+			local entry = { Object = SUFFIX_CONVERT_TO_OBJECT[GetSuffix(tree.Name)](); Hash = tree.Hash; Original = tree; };
 			entry.Object.Name = root;
 			AddToRoot(tree.Parent.FullPath, root, entry.Object)
 			table.insert(objects, entry);
