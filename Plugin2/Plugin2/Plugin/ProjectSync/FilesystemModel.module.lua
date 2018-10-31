@@ -13,8 +13,6 @@ Events:
 	Changed(property): fires when any property changes (e.g., files change on the remote).
 
 Methods:
-	Compare(other): returns a table comparing two file systems. The return value will be a list of the following elements:
-		{ Name = "<relative file path from root>"; Difference = "synced|desynced|selfOnly|otherOnly" }
 	Destroy(): cleans up this instance.
 
 Constructors:
@@ -26,6 +24,11 @@ Constructors:
 local Utils = require(script.Parent.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "FilesystemModel: ", true);
 local ServerRequests = require(script.Parent.Parent.ServerRequests);
+local Helpers = require(script.Parent.Helpers);
+
+local SUFFIXES = Helpers.SUFFIXES;
+local SplitFilePath = Helpers.SplitFilePath;
+local RemoveRoot = Helpers.RemoveRoot;
 
 local FilesystemModel = Utils.new("Class", "FilesystemModel");
 
@@ -37,41 +40,6 @@ FilesystemModel._PollKey = false;
 FilesystemModel.Get.Root = "_Root";
 FilesystemModel.Get.Tree = "_Tree";
 FilesystemModel.Get.Changed = function(self) return self._ChangedEvent.Event; end
-
-local SUFFIXES = {
-	ModuleScript = ".module.lua";
-	LocalScript = ".client.lua";
-	Script = ".server.lua";
-};
-
---[[ @brief Converts a path into its constituent parts.
-	@param path The path to split up.
-	@return path The path to the directory containing the file.
-	@return filename The name of the file minus its suffix.
-	@return suffix The _class_ of suffix (not the suffix itself).
---]]
-local function SplitFilePath(path)
-	local lastSlash = string.find(path, "/[^/]+$")
-	local dir, filename;
-	if lastSlash then
-		dir = string.sub(path, 1, lastSlash - 1);
-		filename = string.sub(path, lastSlash + 1)
-	else
-		dir, filename = "", path;
-	end
-	Debug("SplitFilePath: %s, %s", dir, filename);
-	return dir, filename;
-end
-
---[[ @brief The first part of the path will be chopped off as long as it matches `root`.
-	@param path The path to clean up.
-	@param root The part to remove.
-	@return The path minus the root prefix.
---]]
-local function RemoveRoot(path, root)
-	Utils.Log.Assert(path:sub(1, #root) == root, "Path %s does not start with root %s", path, root);
-	return path:sub(#root + 2);
-end
 
 --[[ @brief Takes input returned by the `parse` operation and makes it more usable (tables and such).
 	@param tree A set of data where each line has a file path & a hash.
@@ -240,53 +208,6 @@ function FilesystemModel:_StopWatching()
 	end
 end
 
---[[ @brief Compares against another FilesystemModel.
---]]
-function FilesystemModel:Compare(other)
-	local comparison = {};
-	local pseudoFolder = { Name = "<PseudoFolder>"; Type = "folder"; Children = {}};
-	local function Compare(a, b)
-		if a.Type == "folder" and b.Type == "folder" then
-			for i, v in pairs(a.Children) do
-				if b.Children[i] then
-					Compare(v, b.Children[i]);
-				else
-					--We only have the entry in `a`.
-					if v.Type == "file" then
-						table.insert(comparison, { Name = v.FullPath; Comparison = "selfOnly"; });
-					elseif v.Type == "folder" then
-						Compare(v, pseudoFolder);
-					end
-				end
-			end
-			for i, v in pairs(b.Children) do
-				if not a.Children[i] then
-					--We only have the entry in `b`.
-					if v.Type == "file" then
-						table.insert(comparison, { Name = v.FullPath; Comparison = "otherOnly"; });
-					elseif v.Type == "folder" then
-						Compare(pseudoFolder, v);
-					end
-				end
-			end
-		elseif a.Type == "file" and b.Type == "file" then
-			if a.Hash == b.Hash then
-				table.insert(comparison, { Name = a.FullPath; Comparison = "synced"; });
-			else
-				table.insert(comparison, { Name = a.FullPath; Comparison = "desynced"; });
-			end
-		elseif a.Type == "file" and b.Type == "folder" then
-			table.insert(comparison, { Name = a.FullPath; Comparison = "selfOnly"; });
-			Compare(pseudoFolder, b);
-		elseif a.Type == "folder" and b.Type == "file" then
-			table.insert(comparison, { Name = b.FullPath; Comparison = "otherOnly"; });
-			Compare(a, pseudoFolder);
-		end
-	end
-	Compare(self._Tree, other._Tree);
-	return comparison;
-end
-
 --[[ @brief Cleans up this instance.
 --]]
 function FilesystemModel:Destroy()
@@ -315,33 +236,6 @@ function FilesystemModel.fromRoot(rootPath)
 	return self;
 end
 
---[[ @brief Creates a file system hierarchy using an Instance from the DataModel.
-	@param root An instance in the data model.
-	@return The file system model.
---]]
-function FilesystemModel.fromInstance(root)
-	local tree = { Name = "<root>"; Type = "folder"; FullPath = ""; Children = {}; };
-	--Find all Scripts, ModuleScripts, or LocalScripts in root and add them to the tree.
-	local function recurse(node, path)
-		if SUFFIXES[node.ClassName] then
-			local filename = node.Name .. SUFFIXES[node.ClassName];
-			AddEntryToTree(tree, path, filename, {
-				Name = filename;
-				Type = "file";
-				Hash = tostring(string.len(node.Source));
-			});
-		end
-		path = path .. node.Name .. "/";
-		for i, v in pairs(node:GetChildren()) do
-			recurse(v, path);
-		end
-	end
-	recurse(root, "");
-	local self = FilesystemModel.new();
-	self._Tree = tree;
-	return self;
-end
-
 local function PrintTree(t, prefix)
 	prefix = prefix or "";
 	if t.Children then
@@ -359,11 +253,7 @@ function FilesystemModel.Test()
 	local f2 = FilesystemModel.fromInstance(game.ServerStorage.Folder);
 	Debug("fromRoot:")
 	PrintTree(f1.Tree);
-	Debug("fromInstance:")
-	PrintTree(f2.Tree);
-	Debug("Difference: %0t", f1:Compare(f2));
 	f1:Destroy();
-	f2:Destroy();
 end
 
 return FilesystemModel;

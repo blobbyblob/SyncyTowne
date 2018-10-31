@@ -11,7 +11,6 @@ Events:
 	Changed: fires when any object is added/removed, or a property is changed on any object.
 
 Methods:
-	Compare(other): compares one StudioModel to another.
 	Destroy(): cleans up this instance.
 
 Constructors:
@@ -22,16 +21,15 @@ Constructors:
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "StudioModel: ", true);
+local Helpers = require(script.Parent.Helpers);
 
-local function CompareHashes(a, b)
-	Debug("Comparing %0t to %0t", a, b);
-	Debug("Hash Types: %s, %s", type(a.Hash), type(b.Hash));
-	return a.Hash == b.Hash;
-end
-local SAVEABLE_TYPES = {
-	Script = CompareHashes;
-	LocalScript = CompareHashes;
-	ModuleScript = CompareHashes;
+local SUFFIXES = Helpers.SUFFIXES;
+local GetSuffix = Helpers.GetSuffix;
+
+local SUFFIX_CONVERT_TO_OBJECT = {
+	ModuleScript = function() return Instance.new("ModuleScript"); end;
+	LocalScript = function() return Instance.new("LocalScript"); end;
+	Script = function() return Instance.new("Script"); end;
 };
 
 local StudioModel = Utils.new("Class", "StudioModel");
@@ -44,57 +42,6 @@ StudioModel._Cxns = false;
 StudioModel.Get.Root = "_Root";
 StudioModel.Get.Objects = "_Objects";
 StudioModel.Get.Changed = function() return self._ChangedEvent.Event; end;
-
-function StudioModel:Compare(other)
-	local results = {};
-	local equivalents = {[self._Root] = other._Root};
-	local function GetEquivalent(obj)
-		if not equivalents[obj] then
-			local parent = GetEquivalent(obj.Parent);
-			if parent and parent:FindFirstChild(obj.Name) then
-				equivalents[obj] = parent:FindFirstChild(obj.Name);
-			else
-				Debug("Cannot find equivalent for %s in %s", obj, parent);
-			end
-		end
-		return equivalents[obj];
-	end
-
-	--Map `other._Objects[i].Object` -> `other._Objects[i]` for all i.
-	local otherObjectsMap = {};
-	for i, v in pairs(other._Objects) do
-		otherObjectsMap[v.Object] = v;
-	end
-
-	local backConvert = {};
-	for i, v in pairs(self._Objects) do
-		local corresponding = GetEquivalent(v.Object);
-		if corresponding and otherObjectsMap[corresponding] then
-			backConvert[corresponding] = v;
-			if corresponding.ClassName == v.Object.ClassName then
-				local comparisonResult = SAVEABLE_TYPES[v.Object.ClassName](v, otherObjectsMap[corresponding]);
-				Debug("Comparing %s against %s: %s", v, otherObjectsMap[corresponding], comparisonResult);
-				if comparisonResult then
-					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "synced"; });
-				else
-					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "desynced"; });
-				end
-			else
-				table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "classMismatch"; });
-			end
-		else
-			table.insert(results, { A = v; Status = "aOnly"; });
-			Debug("Object %s in self, not other", v);
-		end
-	end
-	for i, v in pairs(other._Objects) do
-		if not backConvert[v.Object] then
-			Debug("Object %s in other, not self", v);
-			table.insert(results, { B = v; Status = "bOnly"; });
-		end
-	end
-	return results;
-end
 
 function StudioModel:Destroy()
 	self._Cxns:Destroy();
@@ -136,7 +83,7 @@ function StudioModel:_HookUpConnections()
 		end);
 	end
 	self._Cxns.DescendantAdded = self._Root.DescendantAdded:Connect(function(descendant)
-		if SAVEABLE_TYPES[descendant.ClassName] then
+		if SUFFIXES[descendant.ClassName] then
 			table.insert(self._Objects, { Object = descendant; Hash = tostring(string.len(descendant.Source)); });
 			ListenTo(descendant);
 		end
@@ -173,24 +120,6 @@ function StudioModel.fromInstance(root)
 	self:_HookUpConnections();
 	return self;
 end
-
-local SUFFIXES = {
-	ModuleScript = ".module.lua";
-	LocalScript = ".client.lua";
-	Script = ".server.lua";
-};
-local function GetSuffix(filename)
-	for i, v in pairs(SUFFIXES) do
-		if filename:sub(-#v) == v then
-			return i, filename:sub(1, -#v - 1);
-		end
-	end
-end
-local SUFFIX_CONVERT_TO_OBJECT = {
-	ModuleScript = function() return Instance.new("ModuleScript"); end;
-	LocalScript = function() return Instance.new("LocalScript"); end;
-	Script = function() return Instance.new("Script"); end;
-};
 
 function StudioModel.fromFilesystemModel(fm)
 	local root = Instance.new("Folder");
@@ -326,11 +255,6 @@ function StudioModel.Test()
 	PrintModel(m1);
 	Debug("Model 2:");
 	PrintModel(m2);
-	local comparison = m1:Compare(m2);
-	table.sort(comparison, function(a, b) return a.Status < b.Status; end);
-	for i, v in pairs(comparison) do
-		Debug("%s: %s (%s) - %s (%s)", v.Status, v.A and v.A.Object, v.A and v.A.Hash, v.B and v.B.Object, v.B and v.B.Hash);
-	end
 	m1:Destroy();
 	m2:Destroy();
 end
