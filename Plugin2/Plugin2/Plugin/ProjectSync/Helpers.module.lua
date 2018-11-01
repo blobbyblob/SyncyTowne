@@ -110,28 +110,12 @@ function module.BuildFakeFilesystemModel(str)
 	return root;
 end
 
---[[ @brief Traces a path from root down a path.
-
-	If a child with a particular name cannot be found, a folder will be created.
-	@param root The root which we should start our "trace" from.
-	@param path The path to trace.
-	@return An instance.
+--[[ @brief Adds an object as a descendant of some root object by tracing a path.
+	@param root The root of the project.
+	@param path A path to some descendant. If no descendant exists anywhere along this path, folders will be created.
+	@param name The name of the object.
+	@param obj The object to insert.
 --]]
-function module.GetOrCreateParentAtPath(root, path)
-	for x in string.gmatch(path, "[^/]+") do
-		if root:FindFirstChild(x) then
-			root = root:FindFirstChild(x);
-		else
-			local new = Instance.new("Folder");
-			new.Name = x;
-			new.Parent = root;
-			root = new;
-		end
-	end
-	return root;
-end
---TODO: delete the previous function?
-
 function module.AddToRoot(root, path, name, obj)
 	Debug("AddToRoot(%s, %s, %s) called", path, name, obj);
 	local r = root;
@@ -156,7 +140,19 @@ function module.AddToRoot(root, path, name, obj)
 	obj.Parent = r;
 end
 
---[[ @brief Gets a path given the root & an object within root.
+--[[ @brief Gets a path given the root & an object within root. This also tacks on a suffix.
+
+	For example, our workspace looks as such:
+		workspace
+			Model (Name = "foo")
+				Model (Name = "bar")
+					Script (Name = "baz")
+		GetPath(workspace.foo, workspace.foo.bar.baz) -> "foo.bar.baz.server.lua";
+	Take note that foo is _included_ in the path.
+
+	@param root The root to start descending from.
+	@param script The script to stop at.
+	@return A string that represents the path from root to script.
 --]]
 function module.GetPath(root, script)
 	Utils.Log.Assert(script:IsDescendantOf(root), "script %s expected to be descendant of root %s", script:GetFullName(), root:GetFullName());
