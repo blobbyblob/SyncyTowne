@@ -30,11 +30,17 @@ local Helpers = require(script.Parent.Helpers);
 
 local SUFFIXES = Helpers.SUFFIXES;
 local GetSuffix = Helpers.GetSuffix;
+local SUFFIX_CONVERT_TO_OBJECT = Helpers.SUFFIX_CONVERT_TO_OBJECT;
 
-local SUFFIX_CONVERT_TO_OBJECT = {
-	ModuleScript = function() return Instance.new("ModuleScript"); end;
-	LocalScript = function() return Instance.new("LocalScript"); end;
-	Script = function() return Instance.new("Script"); end;
+local function CompareHashes(a, b)
+	Debug("Comparing %0t to %0t", a, b);
+	Debug("Hash Types: %s, %s", type(a.Hash), type(b.Hash));
+	return a.Hash == b.Hash;
+end
+local CLASS_COMPARISON = {
+	ModuleScript = CompareHashes;
+	LocalScript = CompareHashes;
+	Script = CompareHashes;
 };
 
 local StudioModel = Utils.new("Class", "StudioModel");
@@ -125,7 +131,7 @@ function StudioModel:Compare(other)
 		if corresponding and otherObjectsMap[corresponding] then
 			backConvert[corresponding] = v;
 			if corresponding.ClassName == v.Object.ClassName then
-				local comparisonResult = SAVEABLE_TYPES[v.Object.ClassName](v, otherObjectsMap[corresponding]);
+				local comparisonResult = CLASS_COMPARISON[v.Object.ClassName](v, otherObjectsMap[corresponding]);
 				Debug("Comparing %s against %s: %s", v, otherObjectsMap[corresponding], comparisonResult);
 				if comparisonResult then
 					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "synced"; });
@@ -165,7 +171,7 @@ function StudioModel.fromInstance(root)
 	self._Root = root;
 	--Find all Scripts, ModuleScripts, or LocalScripts in root and add them to the tree.
 	local function recurse(node)
-		if SAVEABLE_TYPES[node.ClassName] then
+		if SUFFIXES[node.ClassName] then
 			table.insert(self._Objects, { Object = node; Hash = tostring(string.len(node.Source)); });
 		end
 		for i, v in pairs(node:GetChildren()) do
@@ -181,27 +187,7 @@ function StudioModel.fromFilesystemModel(fm)
 	local root = Instance.new("Folder");
 	local objects = {};
 	local function AddToRoot(path, name, obj)
-		Debug("AddToRoot(%s, %s, %s) called", path, name, obj);
-		local r = root;
-		local iterator = string.gmatch(path, "[^/]+");
-		iterator();
-		for dir in iterator do
-			if not r:FindFirstChild(dir) then
-				local f = Instance.new("Folder");
-				f.Name = dir;
-				f.Parent = r;
-			end
-			r = r:FindFirstChild(dir);
-		end
-
-		--If we will blow away a Folder, instead, replace it with our object.
-		if r:FindFirstChild(name) then
-			for i, v in pairs(r:FindFirstChild(name):GetChildren()) do
-				v.Parent = obj;
-			end
-			r:FindFirstChild(name).Parent = nil;
-		end
-		obj.Parent = r;
+		Helpers.AddToRoot(root, path, name, obj);
 	end
 	--Scan through the tree; anything that's a file should be created.
 	local function recurse(tree)
@@ -219,45 +205,13 @@ function StudioModel.fromFilesystemModel(fm)
 			end
 		end
 	end
+	Debug("fm: %0t", fm);
 	recurse(fm.Tree);
 
 	local self = StudioModel.new();
 	self._Root = root;
 	self._Objects = objects;
 	return self;
-end
-
-local function BuildFakeFilesystemModel(str)
-	local root = { Tree = { Name = "<root>"; Type = "folder"; FullPath = ""; Parent = nil; Children = {}; }; }
-	local stack = {root.Tree};
-	local lastIndentation;
-	for line in string.gmatch(str, "[^\n]+") do
-		local _, indentation = string.find(line, "^\t+");
-		if not lastIndentation then lastIndentation = indentation; end
-		if indentation ~= #line then
-			for i = indentation + 1, lastIndentation do
-				table.remove(stack);
-			end
-			local endsInSlash = string.find(line, "/$");
-			if endsInSlash then
-				--Create a folder.
-				lastIndentation = indentation + 1;
-				local name = string.sub(line, indentation + 1, endsInSlash - 1);
-				local folder = { Name = name; Type = "folder"; FullPath = stack[#stack].FullPath .. name .. "/"; Parent = stack[#stack]; Children = {}; };
-				stack[#stack].Children[name] = folder;
-				table.insert(stack, folder);
-			else
-				--Create a file.
-				lastIndentation = indentation;
-				local i = string.find(line, " [^ ]+$");
-				local name = string.sub(line, indentation + 1, i - 1);
-				local hash = string.sub(line, i + 1);
-				local file = { Name = name; Type = "file"; FullPath = stack[#stack].FullPath .. name; Parent = stack[#stack]; Hash = hash; };
-				stack[#stack].Children[name] = file;
-			end
-		end
-	end
-	return root;
 end
 
 local function PrintModel(model)
@@ -297,7 +251,7 @@ local TEST_FOLDER = Utils.Misc.Create(
 
 function StudioModel.Test()
 	local m1 = StudioModel.fromInstance(TEST_FOLDER);
-	local fm = BuildFakeFilesystemModel([[
+	local fm = Helpers.BuildFakeFilesystemModel([[
 	Folder/
 		Script.server.lua 22
 		Subfolder.server.lua 22
