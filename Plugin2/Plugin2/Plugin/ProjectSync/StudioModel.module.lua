@@ -87,6 +87,12 @@ function StudioModel:_HookUpConnections()
 				Debug("%s is no longer a part of the studio model", obj);
 				self._Cxns.PropertyChanges[obj] = nil;
 				self._Cxns.AncestryChanges[obj] = nil;
+				for i, v in pairs(self._Objects) do
+					if v.Object == obj then
+						table.remove(self._Objects, i);
+						break;
+					end
+				end
 			elseif child:IsDescendantOf(self._Root) then
 				Debug("%s had its hierarchy changed", obj);
 				self._ChangedEvent:Fire();

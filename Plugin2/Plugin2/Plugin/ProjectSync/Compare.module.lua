@@ -31,7 +31,7 @@ local function DeleteFile(file, prefix)
 	return success;
 end
 local function CreateScript(file, root, prefix)
-	local directory, filename = Helpers.SplitFilePath(prefix .. file.FullPath);
+	local directory, filename = Helpers.SplitFilePath(file.FullPath);
 	local class, name = Helpers.GetSuffix(filename);
 	local obj = Helpers.SUFFIX_CONVERT_TO_OBJECT[class]();
 	local success, response = ServerRequests.read{ File = prefix .. file.FullPath; };
@@ -147,10 +147,25 @@ function module.Compare(filesystemModel, studioModel)
 end
 
 function module.Test()
-	ServerRequests = setmetatable({}, {__index = function(t, i)
+	ServerRequests = setmetatable({
+			_write = function(arg)
+				return true, {};
+			end;
+			_delete = function(arg)
+				return true, {};
+			end;
+			_read = function(arg)
+				return true, { Contents = "foobar"; };
+			end;
+		}, {__index = function(t, i)
 		rawset(t, i, function(arg)
 			Debug("Invoking %s(%t)", i, arg);
-			return false, "lol this is just a mock";
+			local f = rawget(t, "_" .. i);
+			if f then
+				return f(arg);
+			else
+				return false, "lol this is just a mock";
+			end
 		end);
 		return rawget(t, i);
 	end});
@@ -190,8 +205,11 @@ function module.Test()
 	Debug("%0t", comparison)
 	for i, v in pairs(comparison) do
 		Debug("=================\n%s - %s - %s\n=================", v.Script and v.Script.Object or "nil", v.File and v.File.FullPath or "nil", v.Comparison);
-		v:Push();
+		v:Pull();
 		Debug("Moving on...");
+	end
+	for i, v in pairs(sm.Objects) do
+		Debug("%s: %q", v.Object:GetFullName(), string.gsub(v.Object.Source, "\n", "\\n"));
 	end
 	sm:Destroy();
 end
