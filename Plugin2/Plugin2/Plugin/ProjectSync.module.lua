@@ -13,18 +13,93 @@ Events:
 	Changed(): fires when any property changes.
 
 Methods:
-	CheckSync(): determines which scripts disagree with the remote. Returns a list of scripts.
+	CheckSync(): determines which scripts disagree with the remote.
 	Push(script): updates the remote's scripts with the sources from studio. If script is provided, this will be the script which is synced; otherwise, all scripts in the project are synced.
 	Pull(script): updates studio scripts with the sources from the remote. If script is provided, this will be the script which is synced; otherwise, all scripts in the project are synced.
 	SetAutoSync(value): enables/disables auto-sync. This will automatically invoke CheckSync and throw an error if DifferenceCount > 0, so it's wise to check this in advance (or pcall).
-	Iterate(): iterates over all files in this combined studio/filesystem client.
+	Iterate(): iterates over all files in this combined studio/filesystem client. Each invocation to the returned function gives: FilePath, ScriptInStudio, DifferenceType
 	Destroy(): cleans up this object.
 
 Constructors:
-	new(): construct with default settings.
+	new(project): construct with default settings. Argument `project` is a table with keys Local and Remote.
 
 --]]
 
-local module = {}
 
-return module
+local Utils = require(script.Parent.Parent.Utils);
+local ProjectSync = Utils.new("Class", "ProjectSync");
+local Debug = Utils.new("Log", "ProjectSync: ", true);
+
+ProjectSync._Project = { Local = Instance.new("Folder"); Remote = "path/to/project"; };
+ProjectSync._DifferenceCount = 0;
+ProjectSync._AutoSync = false;
+ProjectSync.PullingWillCreateFolders = false;
+ProjectSync.PushingWillDeleteFiles = false;
+ProjectSync._Maid = false;
+
+--[[ @brief Determines which scripts disagree with the remote.
+--]]
+function ProjectSync:CheckSync()
+
+end
+
+--[[ @brief Updates the remote's scripts with the sources from studio.
+	@param script The script which should be synced; if omitted, all scripts in the project are synced.
+--]]
+function ProjectSync:Push(script)
+
+end
+
+--[[ @brief Updates studio scripts with the sources from the remote.
+	@param script The script which should be synced; if omitted, all scripts in the project are synced.
+--]]
+function ProjectSync:Pull(script)
+
+end
+
+--[[ @brief enables/disables auto-sync.
+
+	This will automatically invoke CheckSync and throw an error if DifferenceCount > 0, so it's wise to check this in advance (or pcall).
+--]]
+function ProjectSync:SetAutoSync(value)
+
+end
+
+--[[ @brief Iterates over all files in this combined studio/filesystem client
+	@return A function which, for each invocation, will return a FilePath, ScriptInStudio, DifferenceType for each script maintained in this project. DifferenceType can be "fileOnly", "scriptOnly", "synced", or "desynced".
+--]]
+function ProjectSync:Iterate()
+
+end
+
+--[[ @brief Cleans up this instance.
+--]]
+function ProjectSync:Destroy()
+	self._Maid:Destroy();
+end
+
+--[[ @brief Creates a new ProjectSync instance which connects a local script/folder to a remote path.
+--]]
+function ProjectSync.new(project)
+	local self = setmetatable({}, ProjectSync.Meta);
+	self._Project = {
+		Local = project.Local;
+		Remote = project.Remote;
+	};
+	self._Maid = Utils.new("Maid");
+	self._FilesystemModel = FilesystemModel.fromRoot(project.Remote);
+	self._StudioModel = StudioModel.fromInstance(project.Local);
+	self._Maid._FilesystemModel = self._FilesystemModel;
+	self._Maid._StudioModel = self._StudioModel;
+	return self;
+end
+
+function ProjectSync.Test()
+	local TS = game:GetService("TestService");
+	TS:Check(true, "foobar", script, 36);
+	TS:Check(false, "foobar", script, 37);
+	TS:Checkpoint("checkpoint", script, 38);
+end
+
+return ProjectSync;
+

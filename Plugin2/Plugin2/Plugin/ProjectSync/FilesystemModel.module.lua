@@ -157,41 +157,41 @@ function FilesystemModel:_StartWatching()
 	local key = response.ID;
 	spawn(function()
 		while key == self._PollKey do
-			local _, response = ServerRequests.watch_poll{
+			local success, response = ServerRequests.watch_poll{
 				ID = key;
 			};
-			Debug("watch_poll results: %s, %s", _, response);
+			Debug("watch_poll results: %s, %s", success, response);
 			if key ~= self._PollKey then break; end
 			Debug("Response: %0t", response);
 			local result = SimplifyWatchPollResult(response.FileChange);
 			Debug("SimplifiedWatchPollResult: %s --> %0t", response.FileChange, result);
-			do
-				return;
-			end
-			if mode == "modify" then
+			if result.Mode == "modify" then
 				--Find this object in our tree & update its hash.
-				local path, filename = SplitFilePath(response.FilePath);
+				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
 				if obj then
-					obj.Hash = response.Hash;
+					obj.Hash = result.Hash;
 				else
-					AddEntryToTree(self._Tree, path, filename, { Hash = response.Hash; });
+					AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
 				end
 				self._ChangedEvent:Fire();
-			elseif mode == "error" then
+			elseif result.Mode == "error" then
 				if result.Message == "ID_NO_LONGER_VALID" then
 					self._PollKey = false; --we implicitly have stopped watching.
 				end
-			elseif mode == "add" then
-				local path, filename = SplitFilePath(response.FilePath);
-				AddEntryToTree(self._Tree, path, filename, { Hash = response.Hash; });
+			elseif result.Mode == "add" then
+				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
+				AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
 				self._ChangedEvent:Fire();
-			elseif mode == "delete" then
+			elseif result.Mode == "delete" then
+				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
 				if obj and obj.Parent then
 					obj.Parent.Children[obj.Name] = nil;
 					self._ChangedEvent:Fire();
 				end
+			else
+				Debug("Unexpected mode: %s", result.Mode);
 			end
 		end
 	end);
@@ -250,9 +250,132 @@ end
 
 function FilesystemModel.Test()
 	local f1 = FilesystemModel.fromRoot("SyncyTowne/server/testdir2");
-	local f2 = FilesystemModel.fromInstance(game.ServerStorage.Folder);
-	Debug("fromRoot:")
-	PrintTree(f1.Tree);
+	local SetExpectations, WaitForExpectations; do
+		--@brief Convert tree to mappy boi
+		local function ConvertFolder(t)
+			local r = {};
+			for i, v in pairs(t.Children) do
+				if v.Type == "folder" then
+					r[v.Name] = ConvertFolder(v);
+				elseif v.Type == "file" then
+					r[v.Name] = v.Hash;
+				end
+			end
+			return r;
+		end
+		--@brief Compares expected to actual.
+		local function ExpectationMatch(expected, actual)
+			local function Recurse(A, B)
+				for i, a in pairs(A) do
+					local b = B[i];
+					if b == nil then
+						Utils.Log.Error("Key %s doesn't match; expected %s, got %s", i, a, b);
+					elseif type(a) ~= type(b) then
+						Utils.Log.Error("Key %s doesn't match; expected type is %s, got %s", i, type(a), type(b));
+					elseif type(a) == "table" then
+						local success, str = pcall(Recurse, a, b);
+						if not success then
+							Utils.Log.Error("Key %s doesn't match\n%s", i, str);
+						end
+					else
+						if a ~= b then
+							Utils.Log.Error("Key %s doesn't match; expected %s, got %s", i, a, b);
+						end
+					end
+				end
+				for i, b in pairs(A) do
+					local a = A[i];
+					if a == nil then
+						Utils.Log.Error("Key %s doesn't match; expected nil, got %s", i, a, b);
+					end
+				end
+			end
+			actual = ConvertFolder(actual);
+			local success, str = pcall(Recurse, expected, actual);
+			if success then
+				return true;
+			else
+				Utils.Log.Error("Mismatch!\n%s\nExpected: %0t\nActual: %0t", str, expected, actual);
+			end
+		end
+		local expectations = {};
+		local failState = false;
+		local condition = Instance.new("BindableEvent");
+		f1.Changed:connect(function()
+			Debug("Changed fired");
+			if not expectations[1] then
+				failState = true;
+				Utils.Log.Error("Received unexpected Changed event\n%0t", f1.Tree);
+			end
+			--Ensure f1.Tree matches the front of the expectation queue.
+			--If it does, pop it from the queue. If we're down to 0, fire condition.
+			if ExpectationMatch(expectations[1], f1.Tree) then
+				table.remove(expectations, 1);
+				if #expectations == 0 then
+					condition:Fire();
+				end
+			else
+				failState = true;
+				Utils.Log.Error("Mismatch in expectations;\nexpected %0t\ngot %0t", expectations[1], f1.Tree);
+			end
+		end);
+		--@brief Assert that, when the Changed event fires, the tree will have the given form.
+		function SetExpectations(tree)
+			table.insert(expectations, tree);
+		end
+		--@brief Yields until all expectations are met. Will throw if it times out.
+		function WaitForExpectations(timeout)
+			if not timeout then timeout = .1; end
+			if failState then
+				Utils.Log.Error("Expectation failed");
+			end
+			if #expectations > 0 then
+				local timerRunning = true;
+				spawn(function()
+					wait(timeout);
+					if timerRunning then
+						condition:Fire();
+					end
+				end);
+				condition.Event:Wait();
+				timerRunning = false;
+				if #expectations > 0 then
+					Utils.Log.Error("Timed out in waiting");
+				end
+			end
+		end
+	end
+	local baseExpectation = {
+		Folder = {
+			["Subfolder.server.lua"] = "22";
+			["Script.server.lua"] = "23";
+			Subfolder = {
+				["ModuleScript.module.lua"] = "33";
+				["LocalScript.client.lua"] = "22";
+			};
+		};
+	};
+
+	baseExpectation.Folder["Script.server.lua"] = "7";
+	SetExpectations(baseExpectation);
+	ServerRequests.write{File = "SyncyTowne/server/testdir2/Folder/Script.server.lua", Contents = "foobar\n"};
+	WaitForExpectations();
+
+	baseExpectation.Folder["Script.server.lua"] = "23";
+	SetExpectations(baseExpectation);
+	ServerRequests.write{File = "SyncyTowne/server/testdir2/Folder/Script.server.lua", Contents = "print('Hello, World!');"};
+	WaitForExpectations();
+
+	baseExpectation.Folder["NewScript.server.lua"] = "7";
+	SetExpectations(baseExpectation);
+	ServerRequests.write({File = "SyncyTowne/server/testdir2/Folder/NewScript.server.lua", Contents = "foobar\n"; });
+	WaitForExpectations();
+
+	baseExpectation.Folder["NewScript.server.lua"] = nil;
+	SetExpectations(baseExpectation);
+	ServerRequests.delete{File = "SyncyTowne/server/testdir2/Folder/NewScript.server.lua"};
+	WaitForExpectations();
+
 	f1:Destroy();
 end
 

@@ -27,7 +27,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "RequestWrapper: ", false);
+local Debug = Utils.new("Log", "RequestWrapper: ", true);
 
 local function Identity(x) return x; end
 
@@ -128,7 +128,7 @@ local function StringToArguments(def, text)
 			--Consume the remainder of the string.
 			args[v.Name] = text;
 			text = nil;
-			Debug("Setting args.%s = %s", v.Name, text);
+			Debug("Setting args.%s = %s", v.Name, args[v.Name]);
 		end
 	end
 	return true, args;

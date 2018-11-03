@@ -10,3 +10,6 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 
 
 --]]
+
+require(script.ProjectSync.FilesystemModel).Test();
+
