@@ -14,7 +14,7 @@ Properties:
 
 Methods:
 	Save(parent = game.ServerStorage, name = "SyncyTowneData"): saves the list of projects we're tracking to the data model.
-	Load(parent = game.ServerStorage.SyncyTowneData): loads the list of projects we're tracking from the data model.
+	Load(folder = game.ServerStorage.SyncyTowneData): loads the list of projects we're tracking from the data model.
 
 Events:
 	Changed(property): fires when a property is changed.
@@ -49,6 +49,15 @@ local function ValidateEntry(v, name)
 end
 
 function ProjectManager.Set:Projects(list)
+	self:SetProjects(list);
+end
+ProjectManager.Get.Projects = "_Projects";
+
+function ProjectManager.Get:Changed()
+	return self._ChangedEvent.Event;
+end
+
+function ProjectManager:SetProjects(list)
 	local s = {};
 	local j = 1;
 	for i, v in pairs(list) do
@@ -63,11 +72,6 @@ function ProjectManager.Set:Projects(list)
 	end
 	self._Projects = s;
 	self._ChangedEvent:Fire("Projects");
-end
-ProjectManager.Get.Projects = "_Projects";
-
-function ProjectManager.Get:Changed()
-	return self._ChangedEvent.Event;
 end
 
 function ProjectManager:Save(parent, name)
@@ -153,7 +157,7 @@ function ProjectManager.Load(folder)
 	end
 	if not folder then
 		local x = ProjectManager.new()
-		x.Projects = {};
+		x:SetProjects({});
 		return x;
 	end
 	local projects = {};
@@ -175,7 +179,7 @@ function ProjectManager.Load(folder)
 		table.insert(projects, project);
 	end
 	local x = ProjectManager.new();
-	x.Projects = projects;
+	x:SetProjects(projects);
 	return x;
 end
 

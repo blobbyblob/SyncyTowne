@@ -1,5 +1,5 @@
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Helpers: ", true);
+local Debug = Utils.new("Log", "Helpers: ", false);
 
 local module = {}
 
@@ -163,6 +163,21 @@ function module.GetPath(root, script)
 		table.insert(s, 1, script.Name);
 	end
 	return table.concat(s, "/");
+end
+
+--[[ @brief Returns a script given its path and the root object.
+	@param root The root instance for the project.
+	@param path The path to the script (including the script itself).
+	@return[1] nil if any object within the path doesn't exist.
+	@return[2] A script which exists at the given path.
+--]]
+function module.GetScript(root, path)
+	local class, filename = module.GetSuffix(path);
+	for x in string.gmatch("[^/]+") do
+		root = root:FindFirstChild(x);
+		if not root then return; end
+	end
+	return root;
 end
 
 return module

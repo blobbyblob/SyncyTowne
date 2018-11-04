@@ -12,22 +12,20 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 --]]
 
 wait(2);
-require(script.ProjectSync.FilesystemModel).Test();
-
---Terminate early -- we're just here for the above test.
-do return; end
 
 local Utils = require(script.Parent.Utils);
 local SyncGui = require(script.SyncGui);
 local ProjectManager = require(script.ProjectManager);
 
-local gui = get.Plugin:CreateDockWidgetPluginGui("SyncyTowne", DockWidgetPluginGuiInfo.new());
+local gui = plugin:CreateDockWidgetPluginGui("SyncyTowne2", DockWidgetPluginGuiInfo.new());
 gui.Title = "SyncyTowne";
 
 local syncGui = SyncGui.new();
 syncGui.Parent = gui;
 
-local pm = ProjectManager.Load();
+local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData_Test"));
 pm.Changed:Connect(function()
-	pm:Save();
+	pm:Save(game.ServerStorage, "SyncyTowneData_Test");
 end);
+
+syncGui.ProjectManager = pm;

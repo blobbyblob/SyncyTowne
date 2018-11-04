@@ -27,7 +27,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "RequestWrapper: ", true);
+local Debug = Utils.new("Log", "RequestWrapper: ", false);
 
 local function Identity(x) return x; end
 

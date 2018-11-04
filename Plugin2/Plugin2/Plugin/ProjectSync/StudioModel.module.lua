@@ -52,7 +52,7 @@ StudioModel._Cxns = false;
 
 StudioModel.Get.Root = "_Root";
 StudioModel.Get.Objects = "_Objects";
-StudioModel.Get.Changed = function() return self._ChangedEvent.Event; end;
+StudioModel.Get.Changed = function(self) return self._ChangedEvent.Event; end;
 
 function StudioModel:Destroy()
 	self._Cxns:Destroy();

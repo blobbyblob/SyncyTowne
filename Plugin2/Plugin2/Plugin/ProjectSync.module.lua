@@ -30,6 +30,8 @@ TODO: wire up the changed event properly. We'll have to update DifferenceCount a
 local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "ProjectSync: ", true);
 local Compare = require(script.Compare).Compare;
+local FilesystemModel = require(script.FilesystemModel);
+local StudioModel = require(script.StudioModel);
 
 local SCREEN_TIME= .3;
 local LOCAL_UPDATE_DELAY = 3; --You have to stop editing a script for this many seconds before it gets synced to the remote.
@@ -67,26 +69,47 @@ function ProjectSync:CheckSync()
 	self._StudioModel = StudioModel.fromInstance(self._Project.Local);
 	self._Maid._StudioModel = self._StudioModel;
 	self._Maid.FilesystemChanged = self._FilesystemModel.Changed:Connect(function(file)
+		self._DifferenceCount = self._DifferenceCount + 1;
+		self._ChangedEvent:Fire("DifferenceCount");
 		if tick() < self._RemoteScreenTime then
 			self._ScriptChangeEvent:Fire("Remote", file);
 		end
 	end);
 	self._Maid.StudioChanged = self._StudioModel.Changed:Connect(function(script)
+		self._DifferenceCount = self._DifferenceCount + 1;
+		self._ChangedEvent:Fire("DifferenceCount");
 		if tick() < self._LocalScreenTime then
 			self._ScriptChangeEvent:Fire("Local", script);
 		end
 	end);
+	local differenceCount = 0;
+	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
+		if diff.Comparison ~= "synced" then
+			differenceCount = differenceCount + 1;
+		end
+	end
+	if self._DifferenceCount ~= differenceCount then
+		self._DifferenceCount = differenceCount;
+		self._ChangedEvent:Fire("DifferenceCount");
+	end
 end
 
 --[[ @brief Updates the remote's scripts with the sources from studio.
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Push(script)
+	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
-		if not script or (script == diff.A or script == diff.B) then
+		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
+		if not script or (script == diff.File or script == diff.Script) then
 			self._RemoteScreenTime = tick() + SCREEN_TIME;
 			diff.Push();
+			differenceCount = differenceCount - 1;
 		end
+	end
+	if self._DifferenceCount ~= differenceCount then
+		self._DifferenceCount = differenceCount;
+		self._ChangedEvent:Fire("DifferenceCount");
 	end
 end
 
@@ -94,11 +117,18 @@ end
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Pull(script)
+	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
-		if not script or (script == diff.A or script == diff.B) then
+		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
+		if not script or (script == diff.File or script == diff.Script) then
 			self._LocalScreenTime = tick() + SCREEN_TIME;
 			diff.Pull();
+			differenceCount = differenceCount - 1;
 		end
+	end
+	if self._DifferenceCount ~= differenceCount then
+		self._DifferenceCount = differenceCount;
+		self._ChangedEvent:Fire("DifferenceCount");
 	end
 end
 
@@ -109,6 +139,7 @@ end
 function ProjectSync:SetAutoSync(value)
 	--Whenever the changed event fires, sync from one side to another.
 	if value then
+		local UpdateBuffer = {};
 		self._Maid.AutoSyncCxn = self._ScriptChangeEvent.Event:Connect(function(origin, obj)
 			if origin == "Local" then
 				UpdateBuffer[obj] = (UpdateBuffer[obj] or 0) + 1;
@@ -156,15 +187,14 @@ function ProjectSync.new(project)
 	self._Maid = Utils.new("Maid");
 	self._ChangedEvent = Instance.new("BindableEvent");
 	self._ScriptChangeEvent = Instance.new("BindableEvent");
-	self:CheckSync();
+	spawn(function()
+		self:CheckSync();
+	end);
 	return self;
 end
 
 function ProjectSync.Test()
-	local TS = game:GetService("TestService");
-	TS:Check(true, "foobar", script, 36);
-	TS:Check(false, "foobar", script, 37);
-	TS:Checkpoint("checkpoint", script, 38);
+
 end
 
 return ProjectSync;
