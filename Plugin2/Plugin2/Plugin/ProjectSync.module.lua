@@ -23,38 +23,83 @@ Methods:
 Constructors:
 	new(project): construct with default settings. Argument `project` is a table with keys Local and Remote.
 
+TODO: wire up the changed event properly. We'll have to update DifferenceCount after CheckSync and any time it updates. We may want to avoid updating it if we're planning to respond immediately to the update, but this isn't critical.
+
 --]]
 
-
 local Utils = require(script.Parent.Parent.Utils);
-local ProjectSync = Utils.new("Class", "ProjectSync");
 local Debug = Utils.new("Log", "ProjectSync: ", true);
+local Compare = require(script.Compare).Compare;
 
+local SCREEN_TIME= .3;
+local LOCAL_UPDATE_DELAY = 3; --You have to stop editing a script for this many seconds before it gets synced to the remote.
+
+local ProjectSync = Utils.new("Class", "ProjectSync");
+
+--Publicly readable entries.
 ProjectSync._Project = { Local = Instance.new("Folder"); Remote = "path/to/project"; };
 ProjectSync._DifferenceCount = 0;
 ProjectSync._AutoSync = false;
 ProjectSync.PullingWillCreateFolders = false;
 ProjectSync.PushingWillDeleteFiles = false;
-ProjectSync._Maid = false;
 
---[[ @brief Determines which scripts disagree with the remote.
+--Internal structures
+ProjectSync._Maid = false;
+ProjectSync._StudioModel = false;
+ProjectSync._FilesystemModel = false;
+ProjectSync._RemoteScreenTime = 0; --If tick() is less than this value, we will ignore changed events from the remote.
+ProjectSync._LocalScreenTime = 0; --If tick() is less than this value, we will ignore changed events locally.
+
+--Events
+ProjectSync._ChangedEvent = false;
+ProjectSync._ScriptChangeEvent = false;
+
+ProjectSync.Get.Project = "_Project";
+ProjectSync.Get.DifferenceCount = "_DifferenceCount";
+ProjectSync.Get.AutoSync = "_AutoSync";
+ProjectSync.Get.Changed = function(self) return self._ChangedEvent.Event; end;
+
+--[[ @brief Forces a refresh of the models.
 --]]
 function ProjectSync:CheckSync()
-
+	self._FilesystemModel = FilesystemModel.fromRoot(self._Project.Remote);
+	self._Maid._FilesystemModel = self._FilesystemModel;
+	self._StudioModel = StudioModel.fromInstance(self._Project.Local);
+	self._Maid._StudioModel = self._StudioModel;
+	self._Maid.FilesystemChanged = self._FilesystemModel.Changed:Connect(function(file)
+		if tick() < self._RemoteScreenTime then
+			self._ScriptChangeEvent:Fire("Remote", file);
+		end
+	end);
+	self._Maid.StudioChanged = self._StudioModel.Changed:Connect(function(script)
+		if tick() < self._LocalScreenTime then
+			self._ScriptChangeEvent:Fire("Local", script);
+		end
+	end);
 end
 
 --[[ @brief Updates the remote's scripts with the sources from studio.
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Push(script)
-
+	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
+		if not script or (script == diff.A or script == diff.B) then
+			self._RemoteScreenTime = tick() + SCREEN_TIME;
+			diff.Push();
+		end
+	end
 end
 
 --[[ @brief Updates studio scripts with the sources from the remote.
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Pull(script)
-
+	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
+		if not script or (script == diff.A or script == diff.B) then
+			self._LocalScreenTime = tick() + SCREEN_TIME;
+			diff.Pull();
+		end
+	end
 end
 
 --[[ @brief enables/disables auto-sync.
@@ -62,14 +107,36 @@ end
 	This will automatically invoke CheckSync and throw an error if DifferenceCount > 0, so it's wise to check this in advance (or pcall).
 --]]
 function ProjectSync:SetAutoSync(value)
-
+	--Whenever the changed event fires, sync from one side to another.
+	if value then
+		self._Maid.AutoSyncCxn = self._ScriptChangeEvent.Event:Connect(function(origin, obj)
+			if origin == "Local" then
+				UpdateBuffer[obj] = (UpdateBuffer[obj] or 0) + 1;
+				local b = UpdateBuffer[obj];
+				wait(LOCAL_UPDATE_DELAY);
+				if b == UpdateBuffer[obj] then
+					self:Push(obj);
+				end
+			elseif origin == "Remote" then
+				self:Pull(obj);
+			end
+		end);
+	else
+		self._Maid.AutoSyncCxn = nil;
+	end
+	self._AutoSync = value;
 end
 
 --[[ @brief Iterates over all files in this combined studio/filesystem client
 	@return A function which, for each invocation, will return a FilePath, ScriptInStudio, DifferenceType for each script maintained in this project. DifferenceType can be "fileOnly", "scriptOnly", "synced", or "desynced".
 --]]
 function ProjectSync:Iterate()
-
+	local diff = Compare(self._FilesystemModel, self._StudioModel);
+	local iter = pairs(diff);
+	return function()
+		local _, diff = iter();
+		return diff.File, diff.Script, diff.Comparison;
+	end;
 end
 
 --[[ @brief Cleans up this instance.
@@ -87,10 +154,9 @@ function ProjectSync.new(project)
 		Remote = project.Remote;
 	};
 	self._Maid = Utils.new("Maid");
-	self._FilesystemModel = FilesystemModel.fromRoot(project.Remote);
-	self._StudioModel = StudioModel.fromInstance(project.Local);
-	self._Maid._FilesystemModel = self._FilesystemModel;
-	self._Maid._StudioModel = self._StudioModel;
+	self._ChangedEvent = Instance.new("BindableEvent");
+	self._ScriptChangeEvent = Instance.new("BindableEvent");
+	self:CheckSync();
 	return self;
 end
 

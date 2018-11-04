@@ -10,7 +10,7 @@ Properties:
 		Note that in the case of a folder, children are recursively one of the aforementioned two types.
 
 Events:
-	Changed(property): fires when any property changes (e.g., files change on the remote).
+	Changed(filepath): fires when any file changes (be it added, removed, etc.)
 
 Methods:
 	Destroy(): cleans up this instance.
@@ -174,7 +174,7 @@ function FilesystemModel:_StartWatching()
 				else
 					AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
 				end
-				self._ChangedEvent:Fire();
+				self._ChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "error" then
 				if result.Message == "ID_NO_LONGER_VALID" then
 					self._PollKey = false; --we implicitly have stopped watching.
@@ -182,13 +182,13 @@ function FilesystemModel:_StartWatching()
 			elseif result.Mode == "add" then
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
-				self._ChangedEvent:Fire();
+				self._ChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "delete" then
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
 				if obj and obj.Parent then
 					obj.Parent.Children[obj.Name] = nil;
-					self._ChangedEvent:Fire();
+					self._ChangedEvent:Fire(path .. "/" .. filename);
 				end
 			else
 				Debug("Unexpected mode: %s", result.Mode);

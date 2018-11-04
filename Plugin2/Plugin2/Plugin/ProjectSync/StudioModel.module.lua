@@ -68,7 +68,7 @@ function StudioModel:_HookUpConnections()
 			else
 				self._Cxns.NameChange[r] = r:GetPropertyChangedSignal("Name"):Connect(function()
 					if r:IsDescendantOf(self._Root) then
-						self._ChangedEvent:Fire();
+						self._ChangedEvent:Fire(obj);
 					else
 						self._Cxns.NameChange[r] = nil;
 					end
@@ -78,7 +78,7 @@ function StudioModel:_HookUpConnections()
 		--Watch for Source/Name changes for the script itself.
 		self._Cxns.PropertyChanges[obj] = obj.Changed:Connect(function(property)
 			if property == "Source" or property == "Name" then
-				self._ChangedEvent:Fire();
+				self._ChangedEvent:Fire(obj);
 			end
 		end);
 		--Watch for ancestry changes of any variety.
@@ -95,7 +95,7 @@ function StudioModel:_HookUpConnections()
 				end
 			elseif child:IsDescendantOf(self._Root) then
 				Debug("%s had its hierarchy changed", obj);
-				self._ChangedEvent:Fire();
+				self._ChangedEvent:Fire(obj);
 			end
 		end);
 	end
@@ -110,6 +110,15 @@ function StudioModel:_HookUpConnections()
 	end
 end
 
+--[[ @brief Compares two studio models.
+	@param other The second studio model to compare.
+	@return An array with entries of the following form:
+		{
+			A = <item from self>
+			B = <item from other>
+			Status = "synced|desynced|aOnly|bOnly|classMismatch";
+		}
+--]]
 function StudioModel:Compare(other)
 	local results = {};
 	local equivalents = {[self._Root] = other._Root};
