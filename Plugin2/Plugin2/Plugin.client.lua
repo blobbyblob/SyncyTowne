@@ -11,6 +11,7 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 
 --]]
 
+wait(2);
 require(script.ProjectSync.FilesystemModel).Test();
 
 --Terminate early -- we're just here for the above test.

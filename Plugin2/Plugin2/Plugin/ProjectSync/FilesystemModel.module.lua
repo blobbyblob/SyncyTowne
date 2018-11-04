@@ -181,7 +181,9 @@ function FilesystemModel:_StartWatching()
 				end
 			elseif result.Mode == "add" then
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
-				AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
+				local entry = { Hash = result.Hash; };
+				AddEntryToTree(self._Tree, path, filename, entry);
+				Debug("New Entry: %t", entry);
 				self._ChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "delete" then
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
@@ -295,41 +297,46 @@ function FilesystemModel.Test()
 			if success then
 				return true;
 			else
-				Utils.Log.Error("Mismatch!\n%s\nExpected: %0t\nActual: %0t", str, expected, actual);
+				return false, Utils.Log.Format("Mismatch!\n%s\nExpected: %0t\nActual: %0t", str, expected, actual);
 			end
 		end
 		local expectations = {};
+		local nextIndex = 1;
 		local failState = false;
 		local condition = Instance.new("BindableEvent");
 		f1.Changed:connect(function()
-			Debug("Changed fired");
-			if not expectations[1] then
+			Debug("Changed fired (waiting on %s)", nextIndex);
+			if not expectations[nextIndex] then
 				failState = true;
 				Utils.Log.Error("Received unexpected Changed event\n%0t", f1.Tree);
 			end
 			--Ensure f1.Tree matches the front of the expectation queue.
 			--If it does, pop it from the queue. If we're down to 0, fire condition.
-			if ExpectationMatch(expectations[1], f1.Tree) then
-				table.remove(expectations, 1);
-				if #expectations == 0 then
+			local checkExpectations, errStr = ExpectationMatch(expectations[nextIndex], f1.Tree);
+			if checkExpectations then
+				nextIndex = nextIndex + 1;
+				if nextIndex > #expectations then
 					condition:Fire();
 				end
+			elseif nextIndex > 1 and ExpectationMatch(expectations[nextIndex - 1], f1.Tree) then
+				--Sometimes spurious, duplicate notifications occur. This isn't a big deal.
 			else
 				failState = true;
-				Utils.Log.Error("Mismatch in expectations;\nexpected %0t\ngot %0t", expectations[1], f1.Tree);
+				Utils.Log.Error("%s", errStr);
 			end
 		end);
 		--@brief Assert that, when the Changed event fires, the tree will have the given form.
 		function SetExpectations(tree)
-			table.insert(expectations, tree);
+			table.insert(expectations, Utils.Table.DeepCopy(tree));
 		end
 		--@brief Yields until all expectations are met. Will throw if it times out.
 		function WaitForExpectations(timeout)
-			if not timeout then timeout = .1; end
+			if not timeout then timeout = .4; end
 			if failState then
 				Utils.Log.Error("Expectation failed");
 			end
-			if #expectations > 0 then
+			Debug("%d expectations have been met; expecting %d", nextIndex - 1, #expectations);
+			if nextIndex <= #expectations then
 				local timerRunning = true;
 				spawn(function()
 					wait(timeout);
@@ -339,7 +346,7 @@ function FilesystemModel.Test()
 				end);
 				condition.Event:Wait();
 				timerRunning = false;
-				if #expectations > 0 then
+				if nextIndex <= #expectations then
 					Utils.Log.Error("Timed out in waiting");
 				end
 			end

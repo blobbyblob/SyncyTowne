@@ -81,17 +81,19 @@ class FileWatchCommandHandler:
 					continue
 
 				# Get the hash; failure to do so should cause us to ignore this result.
-				try:
-					with open(filepath, 'rb') as file:
-						time.sleep(.1)
-						hash = helpers.Hash(file.read())
-						logger.debug("Hash of {}: {}", filepath, hash)
-				except Exception as e:
-					continue
+				hash = ""
+				if mode == "modify" or mode == "add":
+					try:
+						with open(filepath, 'rb') as file:
+							time.sleep(.1)
+							hash = helpers.Hash(file.read())
+							logger.debug("Hash of {}: {}", filepath, hash)
+					except Exception as e:
+						continue
 
 				# Inform the user of the change.
 				return {
-					"FileChange": mode + " '" + relativeFilepath + "' " + hash
+					"FileChange": mode + " '" + relativeFilepath + "'" + (" " + hash if hash else "")
 				}
 		except queue.Empty as e:
 			return {
@@ -104,7 +106,7 @@ class FileWatchCommandHandler:
 		else:
 			logger.warning("watch_stop called on non-existent ID {}", id)
 		return {}
-			
+
 class FileWatchCommandHandlerTestCase(unittest.TestCase):
 	testdir = os.path.join(os.path.dirname(__file__), "..", "testdir")
 	def setUp(self):

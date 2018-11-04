@@ -152,7 +152,7 @@ class WatchForChanges(threading.Thread):
 				hDir,
 				1024,
 				True,
-				win32con.FILE_NOTIFY_CHANGE_LAST_WRITE,
+				win32con.FILE_NOTIFY_CHANGE_LAST_WRITE + win32con.FILE_NOTIFY_CHANGE_FILE_NAME + win32con.FILE_NOTIFY_CHANGE_DIR_NAME,
 				None,
 				None
 			)
