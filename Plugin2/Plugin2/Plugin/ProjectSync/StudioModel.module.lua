@@ -31,6 +31,7 @@ local Helpers = require(script.Parent.Helpers);
 local SUFFIXES = Helpers.SUFFIXES;
 local GetSuffix = Helpers.GetSuffix;
 local SUFFIX_CONVERT_TO_OBJECT = Helpers.SUFFIX_CONVERT_TO_OBJECT;
+local GetHash = Helpers.GetHash;
 
 local function CompareHashes(a, b)
 	return a.Hash == b.Hash;
@@ -73,9 +74,19 @@ function StudioModel:_HookUpConnections()
 				end);
 			end
 		end
+		local entry;
+		for i, v in pairs(self._Objects) do
+			if v.Object == obj then
+				entry = v;
+				break;
+			end
+		end
 		--Watch for Source/Name changes for the script itself.
 		self._Cxns.PropertyChanges[obj] = obj.Changed:Connect(function(property)
 			if property == "Source" or property == "Name" then
+				if property == "Source" then
+					entry.Hash = GetHash(obj);
+				end
 				self._ChangedEvent:Fire(obj);
 			end
 		end);
@@ -99,7 +110,7 @@ function StudioModel:_HookUpConnections()
 	end
 	self._Cxns.DescendantAdded = self._Root.DescendantAdded:Connect(function(descendant)
 		if SUFFIXES[descendant.ClassName] then
-			table.insert(self._Objects, { Object = descendant; Hash = tostring(string.len(descendant.Source)); });
+			table.insert(self._Objects, { Object = descendant; Hash = GetHash(descendant); });
 			ListenTo(descendant);
 		end
 	end);
@@ -185,7 +196,7 @@ function StudioModel.fromInstance(root)
 	--Find all Scripts, ModuleScripts, or LocalScripts in root and add them to the tree.
 	local function recurse(node)
 		if SUFFIXES[node.ClassName] then
-			table.insert(self._Objects, { Object = node; Hash = tostring(string.len(node.Source)); });
+			table.insert(self._Objects, { Object = node; Hash = GetHash(node); });
 		end
 		for i, v in pairs(node:GetChildren()) do
 			recurse(v);

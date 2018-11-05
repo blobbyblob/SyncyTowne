@@ -50,6 +50,7 @@ end
 function module.Hash(obj)
 	return tostring(string.len(obj.Source));
 end
+module.GetHash = module.Hash;
 
 --[[ @brief Determines which suffix a filename has, if any, and removes it.
 

@@ -49,8 +49,8 @@ ProjectSync.PushingWillDeleteFiles = false;
 ProjectSync._Maid = false;
 ProjectSync._StudioModel = false;
 ProjectSync._FilesystemModel = false;
-ProjectSync._RemoteScreenTime = 0; --If tick() is less than this value, we will ignore changed events from the remote.
-ProjectSync._LocalScreenTime = 0; --If tick() is less than this value, we will ignore changed events locally.
+ProjectSync._RemoteScreenTime = 0; --If tick() is greater than this value, we will ignore changed events from the remote.
+ProjectSync._LocalScreenTime = 0; --If tick() is greater than this value, we will ignore changed events locally.
 
 --Events
 ProjectSync._ChangedEvent = false;
@@ -84,13 +84,13 @@ function ProjectSync:CheckSync()
 	CheckDifferenceCount(self);
 	self._Maid.FilesystemChanged = self._FilesystemModel.Changed:Connect(function(file)
 		CheckDifferenceCount(self);
-		if tick() < self._RemoteScreenTime then
+		if tick() > self._RemoteScreenTime then
 			self._ScriptChangeEvent:Fire("Remote", file);
 		end
 	end);
 	self._Maid.StudioChanged = self._StudioModel.Changed:Connect(function(script)
 		CheckDifferenceCount(self);
-		if tick() < self._LocalScreenTime then
+		if tick() > self._LocalScreenTime then
 			self._ScriptChangeEvent:Fire("Local", script);
 		end
 	end);
@@ -103,13 +103,16 @@ function ProjectSync:Push(script)
 	Debug("ProjectSync:Push(%s) called", script);
 	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
-		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
-		if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
-			self._RemoteScreenTime = tick() + SCREEN_TIME;
-			diff.Push();
-			differenceCount = differenceCount - 1;
+		if diff.Comparison ~= "synced" then
+			differenceCount = differenceCount + 1;
+			if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
+				self._RemoteScreenTime = tick() + SCREEN_TIME;
+				diff.Push();
+				differenceCount = differenceCount - 1;
+			end
 		end
 	end
+	Debug("Setting DifferenceCount to %s", differenceCount);
 	if self._DifferenceCount ~= differenceCount then
 		self._DifferenceCount = differenceCount;
 		self._ChangedEvent:Fire("DifferenceCount");
@@ -120,15 +123,19 @@ end
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Pull(script)
+	Debug("ProjectSync:Pull(%s) called", script);
 	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
-		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
-		if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
-			self._LocalScreenTime = tick() + SCREEN_TIME;
-			diff.Pull();
-			differenceCount = differenceCount - 1;
+		if diff.Comparison ~= "synced" then
+			differenceCount = differenceCount + 1;
+			if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
+				self._LocalScreenTime = tick() + SCREEN_TIME;
+				diff.Pull();
+				differenceCount = differenceCount - 1;
+			end
 		end
 	end
+	Debug("Setting DifferenceCount to %s", differenceCount);
 	if self._DifferenceCount ~= differenceCount then
 		self._DifferenceCount = differenceCount;
 		self._ChangedEvent:Fire("DifferenceCount");
@@ -144,6 +151,7 @@ function ProjectSync:SetAutoSync(value)
 	if value then
 		local UpdateBuffer = {};
 		self._Maid.AutoSyncCxn = self._ScriptChangeEvent.Event:Connect(function(origin, obj)
+			Debug("Script changed: %s, %s", origin, obj);
 			if origin == "Local" then
 				UpdateBuffer[obj] = (UpdateBuffer[obj] or 0) + 1;
 				local b = UpdateBuffer[obj];
@@ -159,6 +167,7 @@ function ProjectSync:SetAutoSync(value)
 		self._Maid.AutoSyncCxn = nil;
 	end
 	self._AutoSync = value;
+	self._ChangedEvent:Fire("AutoSync");
 end
 
 local COMPARISON_MAP = {
