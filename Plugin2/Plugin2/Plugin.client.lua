@@ -11,7 +11,7 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 
 --]]
 
-wait(2);
+wait(1);
 
 local Utils = require(script.Parent.Utils);
 local SyncGui = require(script.SyncGui);

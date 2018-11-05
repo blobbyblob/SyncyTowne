@@ -224,7 +224,29 @@ local function CreateListElement(self, listIndex)
 	self._ListElements[listIndex] = {gui, sync, pull, push};
 	return gui, sync, pull, push;
 end
-local function CreateListElementForProject(self, project, listIndex)
+
+local function UpdateButtons(pull, push, differenceType, project)
+	if not differenceType then
+		differenceType = "SourceEqual";
+		for FilePath, ScriptInStudio, DifferenceType in project.ProjectSync:Iterate() do
+			if FilePath == filePath then
+				differenceType = DifferenceType;
+				break;
+			end
+		end
+	end
+	if differenceType == "OnlyInStudio" or differenceType == "OnlyOnFilesystem" or differenceType == "SourceMismatch" then
+		SetButtonActive(pull, true);
+		SetButtonActive(push, true);
+	elseif differenceType == "SourceEqual" then
+		SetButtonActive(pull, false);
+		SetButtonActive(push, false);
+	else
+		Utils.Log.Error("Unexpected `differenceType`: %s", differenceType);
+	end
+end
+
+local function CreateListElementForProject(self, project, listIndex, updateSubelements)
 	local gui, sync, pull, push = CreateListElement(self, listIndex);
 	sync.OnClick = function()
 		project.ProjectSync:SetAutoSync(not project.ProjectSync.AutoSync);
@@ -259,6 +281,7 @@ local function CreateListElementForProject(self, project, listIndex)
 			local text = HOVER_TEXT[v.Button.Name .. "-" .. tostring(v.Enabled)];
 			self._Cxns[v] = v.Hovered:Connect(function(h) self:_SetToolTip(h and text); end);
 		end
+		updateSubelements();
 	end
 	CheckDifferenceCount();
 	local function CheckAutoSync()
@@ -292,35 +315,17 @@ local function CreateListElementForScript(self, filePath, script, differenceType
 	sync.Button.BackgroundTransparency = 1;
 	gui.Descriptor.Local.Text = (script and script:GetFullName() or "");
 	gui.Descriptor.Remote.Text = filePath;
-	local function UpdateButtons(differenceType)
-		if not differenceType then
-			differenceType = "SourceEqual";
-			for FilePath, ScriptInStudio, DifferenceType in project.ProjectSync:Iterate() do
-				if FilePath == filePath then
-					differenceType = DifferenceType;
-					break;
-				end
-			end
-		end
-		if differenceType == "OnlyInStudio" or differenceType == "OnlyOnFilesystem" or differenceType == "SourceMismatch" then
-			SetButtonActive(pull, true);
-			SetButtonActive(push, true);
-		elseif differenceType == "SourceEqual" then
-			SetButtonActive(pull, false);
-			SetButtonActive(push, false);
-		else
-			Utils.Log.Error("Unexpected `differenceType`: %s", differenceType);
-		end
-	end
 	pull.OnClick = function()
 		project.ProjectSync:Pull(filePath);
-		UpdateButtons();
+		wait(.1);
+		UpdateButtons(pull, push, nil, project);
 	end
 	push.OnClick = function()
 		project.ProjectSync:Push(filePath);
-		UpdateButtons();
+		wait(.1);
+		UpdateButtons(pull, push, nil, project);
 	end
-	UpdateButtons(differenceType);
+	UpdateButtons(pull, push, differenceType);
 	return gui;
 end
 
@@ -337,7 +342,25 @@ function Gui:_BuildList()
 		local scrollingFrame = self._Gui.Main.ScrollingFrame;
 		local j = 1;
 		for i, project in pairs(self._ProjectManager.Projects or {}) do
-			CreateListElementForProject(self, project, j).Parent = scrollingFrame;
+			local k = j;
+			local function UpdateChildren()
+				if self._SelectedProject == project then
+					local filepathMap = {};
+					for filepath, script, differenceType in project.ProjectSync:Iterate() do
+						filepathMap[filepath] = differenceType;
+					end
+					for j = k + 1, #self._ListElements do
+						local gui, sync, pull, push = unpack(self._ListElements[j]);
+						if sync.Button.BackgroundTransparency ~= 1 then
+							break;
+						end
+						if filepathMap[gui.Descriptor.Remote.Text] then
+							UpdateButtons(pull, push, filepathMap[gui.Descriptor.Remote.Text]);
+						end
+					end
+				end
+			end
+			CreateListElementForProject(self, project, j, UpdateChildren).Parent = scrollingFrame;
 			j = j + 1;
 			if project == self._SelectedProject then
 				for filePath, script, differenceType in project.ProjectSync:Iterate() do

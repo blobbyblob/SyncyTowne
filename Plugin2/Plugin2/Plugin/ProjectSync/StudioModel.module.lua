@@ -33,8 +33,6 @@ local GetSuffix = Helpers.GetSuffix;
 local SUFFIX_CONVERT_TO_OBJECT = Helpers.SUFFIX_CONVERT_TO_OBJECT;
 
 local function CompareHashes(a, b)
-	Debug("Comparing %0t to %0t", a, b);
-	Debug("Hash Types: %s, %s", type(a.Hash), type(b.Hash));
 	return a.Hash == b.Hash;
 end
 local CLASS_COMPARISON = {
@@ -147,10 +145,10 @@ function StudioModel:Compare(other)
 			backConvert[corresponding] = v;
 			if corresponding.ClassName == v.Object.ClassName then
 				local comparisonResult = CLASS_COMPARISON[v.Object.ClassName](v, otherObjectsMap[corresponding]);
-				Debug("Comparing %s against %s: %s", v, otherObjectsMap[corresponding], comparisonResult);
 				if comparisonResult then
 					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "synced"; });
 				else
+					Debug("Script %s differs", v.Object:GetFullName());
 					table.insert(results, { A = v; B = otherObjectsMap[corresponding]; Status = "desynced"; });
 				end
 			else
@@ -220,7 +218,6 @@ function StudioModel.fromFilesystemModel(fm)
 			end
 		end
 	end
-	Debug("fm: %0t", fm);
 	recurse(fm.Tree);
 
 	local self = StudioModel.new();

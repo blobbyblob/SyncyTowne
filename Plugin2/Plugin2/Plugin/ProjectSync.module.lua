@@ -68,40 +68,43 @@ function ProjectSync:CheckSync()
 	self._Maid._FilesystemModel = self._FilesystemModel;
 	self._StudioModel = StudioModel.fromInstance(self._Project.Local);
 	self._Maid._StudioModel = self._StudioModel;
+	local function CheckDifferenceCount(self)
+		local differenceCount = 0;
+		for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
+			if diff.Comparison ~= "synced" then
+				differenceCount = differenceCount + 1;
+			end
+		end
+		Debug("Setting DifferenceCount to %s", differenceCount);
+		if self._DifferenceCount ~= differenceCount then
+			self._DifferenceCount = differenceCount;
+			self._ChangedEvent:Fire("DifferenceCount");
+		end
+	end
+	CheckDifferenceCount(self);
 	self._Maid.FilesystemChanged = self._FilesystemModel.Changed:Connect(function(file)
-		self._DifferenceCount = self._DifferenceCount + 1;
-		self._ChangedEvent:Fire("DifferenceCount");
+		CheckDifferenceCount(self);
 		if tick() < self._RemoteScreenTime then
 			self._ScriptChangeEvent:Fire("Remote", file);
 		end
 	end);
 	self._Maid.StudioChanged = self._StudioModel.Changed:Connect(function(script)
-		self._DifferenceCount = self._DifferenceCount + 1;
-		self._ChangedEvent:Fire("DifferenceCount");
+		CheckDifferenceCount(self);
 		if tick() < self._LocalScreenTime then
 			self._ScriptChangeEvent:Fire("Local", script);
 		end
 	end);
-	local differenceCount = 0;
-	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
-		if diff.Comparison ~= "synced" then
-			differenceCount = differenceCount + 1;
-		end
-	end
-	if self._DifferenceCount ~= differenceCount then
-		self._DifferenceCount = differenceCount;
-		self._ChangedEvent:Fire("DifferenceCount");
-	end
 end
 
 --[[ @brief Updates the remote's scripts with the sources from studio.
 	@param script The script which should be synced; if omitted, all scripts in the project are synced.
 --]]
 function ProjectSync:Push(script)
+	Debug("ProjectSync:Push(%s) called", script);
 	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
 		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
-		if not script or (script == diff.File or script == diff.Script) then
+		if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
 			self._RemoteScreenTime = tick() + SCREEN_TIME;
 			diff.Push();
 			differenceCount = differenceCount - 1;
@@ -120,7 +123,7 @@ function ProjectSync:Pull(script)
 	local differenceCount = 0;
 	for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
 		if diff.Comparison ~= "synced" then differenceCount = differenceCount + 1; end
-		if not script or (script == diff.File or script == diff.Script) then
+		if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
 			self._LocalScreenTime = tick() + SCREEN_TIME;
 			diff.Pull();
 			differenceCount = differenceCount - 1;
@@ -158,15 +161,28 @@ function ProjectSync:SetAutoSync(value)
 	self._AutoSync = value;
 end
 
+local COMPARISON_MAP = {
+	scriptOnly = "OnlyInStudio";
+	fileOnly = "OnlyOnFilesystem";
+	desynced = "SourceMismatch";
+	synced = "SourceEqual";
+};
+
 --[[ @brief Iterates over all files in this combined studio/filesystem client
 	@return A function which, for each invocation, will return a FilePath, ScriptInStudio, DifferenceType for each script maintained in this project. DifferenceType can be "fileOnly", "scriptOnly", "synced", or "desynced".
 --]]
 function ProjectSync:Iterate()
 	local diff = Compare(self._FilesystemModel, self._StudioModel);
-	local iter = pairs(diff);
+	local iter, inv, i = pairs(diff);
+	local diff;
 	return function()
-		local _, diff = iter();
-		return diff.File, diff.Script, diff.Comparison;
+		i, diff = iter(inv, i);
+		if not diff then
+			return;
+		end
+		local script = diff.Script and diff.Script.Object;
+		local file = diff.File and diff.File.FullPath;
+		return file, script, COMPARISON_MAP[diff.Comparison];
 	end;
 end
 
