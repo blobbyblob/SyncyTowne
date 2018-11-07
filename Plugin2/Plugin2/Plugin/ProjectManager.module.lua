@@ -25,7 +25,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Utils);
-local Debug = Utils.new("Log", "ProjectManager: ", true);
+local Debug = Utils.new("Log", "ProjectManager: ", false);
 local ProjectSync = require(script.Parent.ProjectSync);
 
 local ProjectManager = Utils.new("Class", "ProjectManager");

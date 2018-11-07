@@ -22,7 +22,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "FilesystemModel: ", true);
+local Debug = Utils.new("Log", "FilesystemModel: ", false);
 local ServerRequests = require(script.Parent.Parent.ServerRequests);
 local Helpers = require(script.Parent.Helpers);
 
