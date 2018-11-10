@@ -36,8 +36,10 @@ local Main = require(script.Main);
 --local ProjectDetails = require(script.ProjectDetails);
 
 local TOP_LEVEL_FRAME = Instance.new("Frame");
+TOP_LEVEL_FRAME.Name = "SyncGui";
 TOP_LEVEL_FRAME.BackgroundTransparency = 1;
 TOP_LEVEL_FRAME.ClipsDescendants = true;
+TOP_LEVEL_FRAME.Size = UDim2.new(1, 0, 1, 0);
 
 local SyncGui = Utils.new("Class", "SyncGui");
 
@@ -69,6 +71,7 @@ function SyncGui.new(pm)
 	self._Maid = Utils.new("Maid");
 	self._ProjectManager = pm;
 	self._Main = Main.new(pm);
+	self._Main.Frame.Parent = self._Frame;
 	return self;
 end
 
@@ -82,13 +85,22 @@ function SyncGui.Test()
 	local sgui = Instance.new("ScreenGui");
 	sgui.Name = "SyncyTowneGui";
 	sgui.Archivable = false;
-	sgui.Parent = game.StarterGui;
+	sgui.Parent = game.CoreGui;
 
+	local f = Instance.new("Frame");
 	local sg = SyncGui.new(pm);
-	sg.Frame.Size = UDim2.new(.8, 0, .8, 0);
-	sg.Frame.Position = UDim2.new(.5, 0, .5, 0);
-	sg.Frame.AnchorPoint = Vector2.new(.5, .5);
-	sg.Frame.Parent = sgui;
+	if false then
+		f.Size = UDim2.new(.8, 0, .8, 0);
+		f.Position = UDim2.new(.5, 0, .5, 0);
+		f.AnchorPoint = Vector2.new(.5, .5);
+		f.Parent = sgui;
+		sg.Frame.Parent = f;
+	else
+		sg.Frame.Size = UDim2.new(.8, 0, .8, 0);
+		sg.Frame.Position = UDim2.new(.5, 0, .5, 0);
+		sg.Frame.AnchorPoint = Vector2.new(.5, .5);
+		sg.Frame.Parent = sgui;
+	end
 end
 
 return SyncGui;

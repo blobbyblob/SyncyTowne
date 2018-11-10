@@ -225,7 +225,7 @@ local function CreateListElement(self, listIndex)
 	return gui, sync, pull, push;
 end
 
-local function UpdateButtons(pull, push, differenceType, project)
+local function UpdateButtons(pull, push, differenceType, project, filePath)
 	if not differenceType then
 		differenceType = "SourceEqual";
 		for FilePath, ScriptInStudio, DifferenceType in project.ProjectSync:Iterate() do
@@ -318,14 +318,14 @@ local function CreateListElementForScript(self, filePath, script, differenceType
 	pull.OnClick = function()
 		project.ProjectSync:Pull(filePath);
 		wait(.1);
-		UpdateButtons(pull, push, nil, project);
+		UpdateButtons(pull, push, nil, project, filePath);
 	end
 	push.OnClick = function()
 		project.ProjectSync:Push(filePath);
 		wait(.1);
-		UpdateButtons(pull, push, nil, project);
+		UpdateButtons(pull, push, nil, project, filePath);
 	end
-	UpdateButtons(pull, push, differenceType);
+	UpdateButtons(pull, push, differenceType, nil, filePath);
 	return gui;
 end
 
@@ -355,7 +355,7 @@ function Gui:_BuildList()
 							break;
 						end
 						if filepathMap[gui.Descriptor.Remote.Text] then
-							UpdateButtons(pull, push, filepathMap[gui.Descriptor.Remote.Text]);
+							UpdateButtons(pull, push, filepathMap[gui.Descriptor.Remote.Text], nil, nil);
 						end
 					end
 				end
