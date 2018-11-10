@@ -20,6 +20,7 @@ Constructors:
 
 local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "SubscreenWrapper: ", true);
+local Helpers = require(script.Parent.Helpers);
 
 local SUBSCREEN_WRAPPER = script.SubscreenWrapper;
 
@@ -50,11 +51,11 @@ end
 
 function SubscreenWrapper.new()
 	local self = setmetatable({}, SubscreenWrapper.Meta);
-	self._Frame = SUBSCREEN_WRAPPER:Clone();
+	self._Frame, buttons = Helpers.FixImageButtons(SUBSCREEN_WRAPPER:Clone());
 	self._Maid = Utils.new("Maid");
-	self._Maid.Back = self._Frame.TopBar.Back.MouseButton1Down:Connect(function()
+	buttons.Back.OnClick = function()
 		self._ExitCallback();
-	end);
+	end;
 	self._Maid.Frame = self._Frame;
 	return self;
 end

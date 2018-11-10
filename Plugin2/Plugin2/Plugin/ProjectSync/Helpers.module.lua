@@ -156,9 +156,9 @@ end
 	@return A string that represents the path from root to script.
 --]]
 function module.GetPath(root, script)
-	Utils.Log.Assert(script:IsDescendantOf(root), "script %s expected to be descendant of root %s", script:GetFullName(), root:GetFullName());
+	Utils.Log.Assert(script == root or script:IsDescendantOf(root), "script %s expected to be descendant of root %s", script:GetFullName(), root:GetFullName());
 	local suffix = module.SUFFIXES[script.ClassName];
-	local s = {script.Name .. suffix};
+	local s = {script.Name .. (suffix or "")};
 	while script ~= root and script ~= nil do
 		script = script.Parent;
 		table.insert(s, 1, script.Name);

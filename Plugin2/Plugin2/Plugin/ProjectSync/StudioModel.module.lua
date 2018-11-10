@@ -218,10 +218,12 @@ function StudioModel.fromFilesystemModel(fm)
 		Debug("Scanning %s", tree.Name);
 		if tree.Type == "file" then
 			local class, root = GetSuffix(tree.Name);
-			local entry = { Object = SUFFIX_CONVERT_TO_OBJECT[GetSuffix(tree.Name)](); Hash = tree.Hash; Original = tree; };
-			entry.Object.Name = root;
-			AddToRoot(tree.Parent.FullPath, root, entry.Object)
-			table.insert(objects, entry);
+			if class then
+				local entry = { Object = SUFFIX_CONVERT_TO_OBJECT[GetSuffix(tree.Name)](); Hash = tree.Hash; Original = tree; };
+				entry.Object.Name = root;
+				AddToRoot(tree.Parent.FullPath, root, entry.Object)
+				table.insert(objects, entry);
+			end
 		elseif tree.Type == "folder" then
 			--Skip folders. We'll implicitly create them if we need to.
 			for i, v in pairs(tree.Children) do
