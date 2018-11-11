@@ -25,6 +25,7 @@ local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "Main: ", true);
 local AddNew = require(script.Parent.AddNew);
 local SubscreenWrapper = require(script.Parent.SubscreenWrapper);
+local ProjectDetails = require(script.Parent.ProjectDetails);
 local Helpers = require(script.Parent.Helpers);
 
 local FixImageButtons = Helpers.FixImageButtons;
@@ -46,7 +47,7 @@ Main._Frame = false;
 Main._SyncCallback = function(mode, project, script) Debug("SyncCallback(%s, %s, %s) invoked", mode, project, script); end;
 Main._ConnectionStatus = false;
 Main._RefreshCallback = function(project) Debug("RefreshCallback(%s) invoked", project); end;
-Main._Subpage = false;
+Main._CloseSubpage = function() end;
 
 Main._Maid = false;
 Main._ProjectGuis = {};
@@ -76,6 +77,10 @@ function Main:_CreateAllProjects(pm)
 		buttons.OnClick = function()
 			self._SyncCallback("sync", project);
 		end;
+		self._Maid[g] = g.MouseButton1Click:Connect(function()
+			local pd = ProjectDetails.new(project, false);
+			self:_SetSubpage(pd, "Project Details");
+		end);
 	end
 	self._Frame.ScrollContent.CanvasSize = UDim2.new(0, 0, 0, (self._ProjectGuis[#self._ProjectGuis].AbsolutePosition - self._Frame.ScrollContent.AbsolutePosition + self._ProjectGuis[#self._ProjectGuis].AbsoluteSize).y);
 end
@@ -83,6 +88,40 @@ end
 function Main:Destroy()
 	self._Frame:Destroy();
 	self._Maid:Destroy();
+end
+
+function Main:_SetSubpage(subpage, title)
+	local sub = SubscreenWrapper.new();
+	sub.Title = title;
+	self._Frame:TweenPosition(UDim2.new(-self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
+	sub.Frame.Position = UDim2.new(sub.Frame.Size.X, UDim.new());
+	sub.Frame.Parent = self._Frame.Parent;
+	sub.Frame:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
+
+	sub.SubscreenFrame = subpage.Frame;
+
+	local function TweenBack()
+		self._Frame:TweenPosition(UDim2.new(), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
+		sub.Frame:TweenPosition(UDim2.new(self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
+		local subscreen = self._Maid.Subscreen;
+		spawn(function()
+			wait(PAGE_TIME);
+			if self._Maid.Subscreen == subscreen then
+				self._Maid.Subscreen = nil;
+			end
+		end);
+	end
+	self._CloseSubpage = function()
+		local f = TweenBack;
+		TweenBack = nil;
+		f();
+	end;
+	sub.ExitCallback = self._CloseSubpage;
+
+	self._Maid.Subscreen = function()
+		sub:Destroy();
+		subpage:Destroy();
+	end;
 end
 
 function Main.new(pm)
@@ -98,25 +137,9 @@ function Main.new(pm)
 		end
 	end);
 	self._Buttons.Add.OnClick = function()
-		local sub = SubscreenWrapper.new();
-		sub.Title = "Add New";
-		sub.ExitCallback = function()
-			self._Frame:TweenPosition(UDim2.new(), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
-			sub.Frame:TweenPosition(UDim2.new(self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
-			spawn(function()
-				wait(PAGE_TIME);
-				self._Maid.Subscreen = nil;
-			end);
-		end;
-		self._Frame:TweenPosition(UDim2.new(-self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
-		sub.Frame.Position = UDim2.new(sub.Frame.Size.X, UDim.new());
-		sub.Frame.Parent = self._Frame.Parent;
-		sub.Frame:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
-
 		local add = AddNew.new();
-		self._Subpage = add;
-		sub.SubscreenFrame = add.Frame;
-		add.ExitCallback = sub.ExitCallback;
+		self:_SetSubpage(add, "Add New");
+		add.ExitCallback = self._CloseSubpage;
 		add.AddCallback = function(script, filepath)
 			table.insert(pm.Projects, {
 				Local = script;
@@ -124,11 +147,6 @@ function Main.new(pm)
 				Exceptions = {};
 			});
 			pm.Projects = pm.Projects;
-		end;
-
-		self._Maid.Subscreen = function()
-			sub:Destroy();
-			add:Destroy();
 		end;
 	end
 	return self;

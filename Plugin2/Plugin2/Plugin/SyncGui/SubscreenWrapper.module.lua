@@ -51,6 +51,7 @@ end
 
 function SubscreenWrapper.new()
 	local self = setmetatable({}, SubscreenWrapper.Meta);
+	local buttons;
 	self._Frame, buttons = Helpers.FixImageButtons(SUBSCREEN_WRAPPER:Clone());
 	self._Maid = Utils.new("Maid");
 	buttons.Back.OnClick = function()
