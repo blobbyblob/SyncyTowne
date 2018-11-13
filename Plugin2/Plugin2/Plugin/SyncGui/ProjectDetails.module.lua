@@ -53,6 +53,7 @@ end
 function ProjectDetails:_UpdateButtons()
 	Debug("DifferenceCount: %s", self._Project.ProjectSync.DifferenceCount);
 	local differenceExists = self._Project.ProjectSync.DifferenceCount ~= 0;
+	self._Buttons.AutoSync.Selected = self._Project.ProjectSync.AutoSync;
 	self._Buttons.AutoSync.Enabled = not differenceExists;
 	self._Buttons.Push.Enabled = differenceExists;
 	self._Buttons.Pull.Enabled = differenceExists;

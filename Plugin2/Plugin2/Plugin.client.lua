@@ -18,6 +18,7 @@ wait(1);
 --do return; end
 
 local Utils = require(script.Parent.Utils);
+local Debug = Utils.new("Log", "Plugin: ", true);
 local SyncGui = require(script.SyncGui);
 local ProjectManager = require(script.ProjectManager);
 
@@ -32,9 +33,11 @@ end);
 local syncGui = SyncGui.new(pm);
 syncGui.Frame.Parent = gui;
 syncGui.RefreshCallback = function(project)
+	Debug("RefreshCallback(%s) called", project);
 	project.ProjectSync:CheckSync();
 end;
 syncGui.SyncCallback = function(mode, project, script)
+	Debug("SyncCallback(%s, %s, %s) called", mode, project, script);
 	if mode == "sync" then
 		project.ProjectSync:SetAutoSync(script);
 	elseif mode == "pull" then
