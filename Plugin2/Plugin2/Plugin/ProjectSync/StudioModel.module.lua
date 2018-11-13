@@ -211,7 +211,19 @@ function StudioModel.fromFilesystemModel(fm)
 	local root = Instance.new("Folder");
 	local objects = {};
 	local function AddToRoot(path, name, obj)
-		Helpers.AddToRoot(root, path, name, obj);
+		Debug("AddToRoot(%s, %s, %s) called", path, name, obj);
+		local first = string.match(path, "^[^/]+");
+		if first then
+			--make sure the root name matches the first directory.
+			root.Name = first;
+			Helpers.AddToRoot(root, path, name, obj);
+		else
+			--We have a script at top-level, so we should replace `root` with the proper script.
+			for i, v in pairs(root:GetChildren()) do
+				v.Parent = obj;
+			end
+			root = obj;
+		end
 	end
 	--Scan through the tree; anything that's a file should be created.
 	local function recurse(tree)
@@ -274,7 +286,7 @@ local TEST_FOLDER = Utils.Misc.Create(
 	}
 );
 
-function StudioModel.Test()
+function StudioModel.TestManualCompare()
 	local m1 = StudioModel.fromInstance(TEST_FOLDER);
 	local fm = Helpers.BuildFakeFilesystemModel([[
 	Folder/
@@ -293,5 +305,20 @@ function StudioModel.Test()
 	m1:Destroy();
 	m2:Destroy();
 end
+
+--[[ @brief Tests that a root script can be converted into a StudioModel from a FilesystemModel.
+--]]
+function StudioModel.TestRootScript()
+	local fm = Helpers.BuildFakeFilesystemModel([[
+		Main.server.lua 5
+		Main/
+			Subscript.server.lua 5
+	]]);
+	local m2 = StudioModel.fromFilesystemModel(fm);
+	Debug("Model 2: ");
+	PrintModel(m2);
+end
+
+StudioModel.Test = StudioModel.TestRootScript;
 
 return StudioModel;
