@@ -79,6 +79,10 @@ local function AddEntryToTree(root, path, name, entry)
 		end
 		root = root.Children[folder];
 	end
+
+	entry.Type = entry.Type or "file";
+	entry.Name = name;
+
 	entry.Parent = root;
 	entry.FullPath = root.FullPath .. name;
 	root.Children[name] = entry;
@@ -192,6 +196,8 @@ function FilesystemModel:_StartWatching()
 					obj.Parent.Children[obj.Name] = nil;
 					self._ChangedEvent:Fire(path .. "/" .. filename);
 				end
+			elseif result.Mode == "timeout" then
+				--Not a big deal! We'll just poll again.
 			else
 				Debug("Unexpected mode: %s", result.Mode);
 			end

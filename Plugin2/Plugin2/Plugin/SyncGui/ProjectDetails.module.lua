@@ -16,7 +16,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "AddNew: ", true);
+local Debug = Utils.new("Log", "ProjectDetails: ", true);
 local Helpers = require(script.Parent.Helpers);
 
 local PROJECT_DETAILS_GUI = script.ProjectDetailsContents;
@@ -123,6 +123,7 @@ function ProjectDetails.new(ps, syncMode)
 	end;
 	self._Frame.Header.Title.Text = ps.Remote;
 	self._Maid.ProjectSyncChanged = ps.ProjectSync.Changed:Connect(function(property)
+		Debug("ProjectSync.%s Changed to %s", property, ps.ProjectSync[property]);
 		if property == "DifferenceCount" then
 			self:_UpdateButtons();
 		elseif property == "AutoSync" then

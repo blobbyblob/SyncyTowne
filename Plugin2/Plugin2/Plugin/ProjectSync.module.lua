@@ -75,7 +75,7 @@ function ProjectSync:CheckSync()
 				differenceCount = differenceCount + 1;
 			end
 		end
-		Debug("Setting DifferenceCount to %s", differenceCount);
+		Debug("Setting DifferenceCount to %s%s", differenceCount, self._DifferenceCount ~= differenceCount and " (Changed)" or "");
 		if self._DifferenceCount ~= differenceCount then
 			self._DifferenceCount = differenceCount;
 			self._ChangedEvent:Fire("DifferenceCount");
@@ -108,11 +108,10 @@ function ProjectSync:Push(script)
 			if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
 				self._RemoteScreenTime = tick() + SCREEN_TIME;
 				diff.Push();
-				differenceCount = differenceCount - 1;
 			end
 		end
 	end
-	Debug("Setting DifferenceCount to %s", differenceCount);
+	Debug("Setting DifferenceCount to %s%s", differenceCount, self._DifferenceCount ~= differenceCount and " (Changed)" or "");
 	if self._DifferenceCount ~= differenceCount then
 		self._DifferenceCount = differenceCount;
 		self._ChangedEvent:Fire("DifferenceCount");
@@ -131,11 +130,10 @@ function ProjectSync:Pull(script)
 			if not script or (script == (diff.File and diff.File.FullPath) or script == (diff.Script and diff.Script.Object)) then
 				self._LocalScreenTime = tick() + SCREEN_TIME;
 				diff.Pull();
-				differenceCount = differenceCount - 1;
 			end
 		end
 	end
-	Debug("Setting DifferenceCount to %s", differenceCount);
+	Debug("Setting DifferenceCount to %s%s", differenceCount, self._DifferenceCount ~= differenceCount and " (Changed)" or "");
 	if self._DifferenceCount ~= differenceCount then
 		self._DifferenceCount = differenceCount;
 		self._ChangedEvent:Fire("DifferenceCount");
