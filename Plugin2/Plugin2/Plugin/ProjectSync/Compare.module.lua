@@ -58,7 +58,7 @@ local function DeleteScript(script)
 		f.Name = script.Name;
 		f.Parent = script.Parent;
 		for i, v in pairs(script:GetChildren()) do
-			v.Parent = v;
+			v.Parent = f;
 		end
 	end
 	script:Destroy();

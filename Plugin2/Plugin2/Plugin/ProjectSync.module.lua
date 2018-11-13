@@ -65,9 +65,9 @@ ProjectSync.Get.Changed = function(self) return self._ChangedEvent.Event; end;
 --]]
 function ProjectSync:CheckSync()
 	self._FilesystemModel = FilesystemModel.fromRoot(self._Project.Remote);
-	self._Maid._FilesystemModel = self._FilesystemModel;
+	self._Maid:SetTask('_FilesystemModel', self._FilesystemModel);
 	self._StudioModel = StudioModel.fromInstance(self._Project.Local);
-	self._Maid._StudioModel = self._StudioModel;
+	self._Maid:SetTask('_StudioModel', self._StudioModel);
 	local function CheckDifferenceCount(self)
 		local differenceCount = 0;
 		for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
@@ -184,14 +184,14 @@ function ProjectSync:Iterate()
 	local diff = Compare(self._FilesystemModel, self._StudioModel);
 	local iter, inv, i = pairs(diff);
 	local diff;
-	return function()
+	return function(_, i)
 		i, diff = iter(inv, i);
 		if not diff then
 			return;
 		end
 		local script = diff.Script and diff.Script.Object;
 		local file = diff.File and diff.File.FullPath;
-		return file, script, COMPARISON_MAP[diff.Comparison];
+		return i, file, script, COMPARISON_MAP[diff.Comparison];
 	end;
 end
 

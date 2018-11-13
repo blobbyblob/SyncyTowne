@@ -101,6 +101,19 @@ function SyncGui.Test()
 		sg.Frame.AnchorPoint = Vector2.new(.5, .5);
 		sg.Frame.Parent = sgui;
 	end
+
+	sg.RefreshCallback = function(project)
+		project.ProjectSync:CheckSync();
+	end;
+	sg.SyncCallback = function(mode, project, script)
+		if mode == "sync" then
+			project.ProjectSync:SetAutoSync(script);
+		elseif mode == "pull" then
+			project.ProjectSync:Pull(script);
+		elseif mode == "push" then
+			project.ProjectSync:Push(script);
+		end
+	end;
 end
 
 return SyncGui;

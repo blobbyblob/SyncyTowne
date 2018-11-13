@@ -6,7 +6,7 @@ Properties:
 	SyncCallback (function(mode, project[, script])): a function which is called when the sync button is pressed. This is generic to whether it is a push/pull/auto-sync being set.
 		mode: One of the following three strings: "push", "pull", "sync".
 		project: The project which the button was pressed for.
-		script: the script we should be syncing. If nil, it indicates that we should push/pull/sync everything. This must be nil if the mode is "sync".
+		script: the script we should be syncing. If nil, it indicates that we should push/pull/sync everything. If the mode is "sync", this can be true or false (indicating whether we want auto-sync on or off).
 	ConnectionStatus (boolean): set to true to indicate that we are connected.
 	RefreshCallback (function(project)): a function which is called when the refresh button is pressed.
 		project: the project which the user requested to refresh. This may be nil, indicating that the user wants to refresh everything.
@@ -74,15 +74,47 @@ function Main:_CreateAllProjects(pm)
 		g.BackgroundColor3 = LIST_BACKGROUND_COLORS[(i-1)%2];
 		g.LayoutOrder = i;
 		g.Parent = self._Frame.ScrollContent;
-		buttons.OnClick = function()
-			self._SyncCallback("sync", project);
+		buttons.Sync.OnClick = function()
+			--If the project has any differences, first open the sync screen. Otherwise, just start auto-sync.
+			if project.ProjectSync.DifferenceCount > 0 then
+				local pd = ProjectDetails.new(project, true);
+				pd.SyncCallback = self._SyncCallback;
+				pd.RefreshCallback = self._RefreshCallback;
+				self:_SetSubpage(pd, "Resolve Conflicts");
+
+				--Listen for all conflicts being resolved.
+				self._Maid.Subpage.CloseWhenDifferenceCountDropsToZero = project.ProjectSync.Changed:Connect(function(property)
+					if property == "DifferenceCount" then
+						if project.ProjectSync.DifferenceCount == 0 then
+							self._CloseSubpage();
+							self._Maid.Subpage.CloseWhenDifferenceCountDropsToZero = nil;
+							self._SyncCallback("sync", project, true);
+						end
+					end
+				end);
+			else
+				self._SyncCallback("sync", project, not project.ProjectSync.AutoSync);
+			end
 		end;
-		self._Maid[g] = g.MouseButton1Click:Connect(function()
+		self._Maid[g] = Utils.new("Maid");
+		self._Maid[g].AutoSyncChanged = project.ProjectSync.Changed:Connect(function(property)
+			if property == "AutoSync" then
+				buttons.Sync.Selected = project.ProjectSync.AutoSync;
+			end
+		end);
+		self._Maid[g].BackdropClicked = g.MouseButton1Click:Connect(function()
 			local pd = ProjectDetails.new(project, false);
+			pd.SyncCallback = self._SyncCallback;
+			pd.RefreshCallback = self._RefreshCallback;
 			self:_SetSubpage(pd, "Project Details");
 		end);
 	end
-	self._Frame.ScrollContent.CanvasSize = UDim2.new(0, 0, 0, (self._ProjectGuis[#self._ProjectGuis].AbsolutePosition - self._Frame.ScrollContent.AbsolutePosition + self._ProjectGuis[#self._ProjectGuis].AbsoluteSize).y);
+	local function GetRequiredHeight(first, last)
+		if not first or not last then return 0; end
+		return (last.AbsolutePosition - first.AbsolutePosition + last.AbsoluteSize).y
+	end
+	self._Frame.ScrollContent.CanvasSize = UDim2.new(0, 0, 0, GetRequiredHeight(self._ProjectGuis[1], self._Frame.ScrollContent.Add));
+	Debug("Required Height: %s", self._Frame.ScrollContent.CanvasSize.Y.Offset);
 end
 
 function Main:Destroy()
@@ -90,7 +122,23 @@ function Main:Destroy()
 	self._Maid:Destroy();
 end
 
+--[[ @brief "Opens" a subpage for viewing.
+
+	This page will slide in from the right.
+
+	As a postcondition, when this function is complete, the main frame (project list) will not be
+	visible. A function "self._CloseSubpage" will be assigned which nicely tweens Main back into
+	position. `self._Maid.Subpage` will be set to a maid that gets cleaned up when the subpage
+	completely exits the view.
+
+	@param subpage The subpage to open. It should have:
+		* Property "Frame"
+		* Method "Destroy"
+	@param title The title of this subpage.
+--]]
 function Main:_SetSubpage(subpage, title)
+	self._Maid.Subpage = nil;
+
 	local sub = SubscreenWrapper.new();
 	sub.Title = title;
 	self._Frame:TweenPosition(UDim2.new(-self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
@@ -103,24 +151,30 @@ function Main:_SetSubpage(subpage, title)
 	local function TweenBack()
 		self._Frame:TweenPosition(UDim2.new(), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
 		sub.Frame:TweenPosition(UDim2.new(self._Frame.Size.X, UDim.new()), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, PAGE_TIME, true);
-		local subscreen = self._Maid.Subscreen;
+		local subscreen = self._Maid.Subpage;
 		spawn(function()
 			wait(PAGE_TIME);
-			if self._Maid.Subscreen == subscreen then
-				self._Maid.Subscreen = nil;
+			if self._Maid.Subpage == subscreen then
+				self._Maid.Subpage = nil;
 			end
 		end);
 	end
 	self._CloseSubpage = function()
-		local f = TweenBack;
-		TweenBack = nil;
-		f();
+		if TweenBack then
+			local f = TweenBack;
+			TweenBack = nil;
+			f();
+		end
 	end;
 	sub.ExitCallback = self._CloseSubpage;
 
-	self._Maid.Subscreen = function()
+	self._Maid.Subpage = Utils.new("Maid");
+	self._Maid.Subpage.DestroyFrames = function()
 		sub:Destroy();
 		subpage:Destroy();
+	end;
+	self._Maid.Subpage.ClearTweenFunction = function()
+		TweenBack = nil;
 	end;
 end
 

@@ -101,6 +101,7 @@ function module.BuildFakeFilesystemModel(str)
 				--Create a file.
 				lastIndentation = indentation;
 				local i = string.find(line, " [^ ]+$");
+				Utils.Log.Assert(i, "All files must be followed by their hash when creating a fake FilesystemModel");
 				local name = string.sub(line, indentation + 1, i - 1);
 				local hash = string.sub(line, i + 1);
 				local file = { Name = name; Type = "file"; FullPath = stack[#stack].FullPath .. name; Parent = stack[#stack]; Hash = hash; };

@@ -65,7 +65,7 @@ function ProjectDetails:_RecreateRows()
 		v:Destroy();
 	end
 	self._FileGuis = {};
-	for file, script, difference in self._Project.ProjectSync:Iterate() do
+	for i, file, script, difference in self._Project.ProjectSync:Iterate() do
 		if not self._ShowDifferencesOnly or difference ~= "SourceEqual" then
 			local entry, buttons = Helpers.FixImageButtons(SCRIPT_ENTRY:Clone());
 			entry.FilePath.Text = file or "";
@@ -89,6 +89,7 @@ function ProjectDetails:_RecreateRows()
 		end
 	end
 	local function GetRequiredHeight(first, last)
+		if not first or not last then return 0; end
 		return (last.AbsolutePosition - first.AbsolutePosition + last.AbsoluteSize).y
 	end
 	self._Frame.Scroller.CanvasSize = UDim2.new(0, 0, 0, GetRequiredHeight(self._FileGuis[1], self._FileGuis[#self._FileGuis]));
@@ -108,7 +109,7 @@ function ProjectDetails.new(ps, syncMode)
 		end
 	end
 	self._Buttons.AutoSync.OnClick = function()
-		self.SyncCallback("sync", self._Project);
+		self.SyncCallback("sync", self._Project, not self._Project.ProjectSync.AutoSync);
 	end;
 	self._Buttons.Refresh.OnClick = function()
 		self.RefreshCallback(self._Project);
