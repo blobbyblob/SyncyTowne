@@ -11,8 +11,6 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 
 --]]
 
-wait(1);
-
 --require(script.ProjectSync.StudioModel).Test();
 --
 --do return; end
@@ -25,9 +23,9 @@ local ProjectManager = require(script.ProjectManager);
 local gui = plugin:CreateDockWidgetPluginGui("SyncyTowne2", DockWidgetPluginGuiInfo.new());
 gui.Title = "SyncyTowne";
 
-local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData_Test"));
+local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData"));
 pm.Changed:Connect(function()
-	pm:Save(game.ServerStorage, "SyncyTowneData_Test");
+	pm:Save(game.ServerStorage, "SyncyTowneData");
 end);
 
 local syncGui = SyncGui.new(pm);
@@ -45,4 +43,14 @@ syncGui.SyncCallback = function(mode, project, script)
 	elseif mode == "push" then
 		project.ProjectSync:Push(script);
 	end
+end;
+syncGui.DeleteCallback = function(project)
+	Debug("DeleteCallback(%s) called", project);
+	for i, v in pairs(pm.Projects) do
+		if v == project then
+			table.remove(pm.Projects, i);
+			break;
+		end
+	end
+	pm.Projects = pm.Projects;
 end;

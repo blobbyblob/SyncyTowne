@@ -59,6 +59,8 @@ SyncGui.Set.ConnectionStatus = function(self, v) self._Main.ConnectionStatus = v
 SyncGui.Get.ConnectionStatus = function(self) return self._Main.ConnectionStatus; end;
 SyncGui.Set.RefreshCallback = function(self, v) self._Main.RefreshCallback = v; end;
 SyncGui.Get.RefreshCallback = function(self) return self._Main.RefreshCallback; end;
+SyncGui.Set.DeleteCallback = function(self, v) self._Main.DeleteCallback = v; end;
+SyncGui.Get.DeleteCallback = function(self) return self._Main.DeleteCallback; end;
 
 function SyncGui:Destroy()
 	self._Frame:Destroy();

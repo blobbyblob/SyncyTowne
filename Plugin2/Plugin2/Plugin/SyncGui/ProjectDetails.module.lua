@@ -24,8 +24,8 @@ local SCRIPT_ENTRY = PROJECT_DETAILS_GUI.Scroller.ScriptEntry;
 SCRIPT_ENTRY.Parent = nil;
 
 local LIST_BACKGROUND_COLORS = {
-	[0] = Color3.fromRGB(255, 255, 255);
-	Color3.fromRGB(199, 246, 255);
+	[0] = Color3.fromRGB(199, 246, 255);
+	Color3.fromRGB(255, 255, 255);
 };
 
 local ProjectDetails = Utils.new("Class", "ProjectDetails");
@@ -40,6 +40,9 @@ ProjectDetails.SyncCallback = function(mode, project, script)
 end;
 ProjectDetails.RefreshCallback = function(project)
 	Debug("RefreshCallback(%s) invoked", project);
+end;
+ProjectDetails.DeleteCallback = function(project)
+	Debug("DeleteCallback(%s) invoked", project);
 end;
 ProjectDetails._Buttons = {};
 ProjectDetails._FileGuis = {};
@@ -61,10 +64,11 @@ function ProjectDetails:_UpdateButtons()
 end
 
 function ProjectDetails:_RecreateRows()
-	local i = 2;
 	for i, v in pairs(self._FileGuis) do
 		v:Destroy();
 	end
+
+	local j = 2;
 	self._FileGuis = {};
 	for i, file, script, difference in self._Project.ProjectSync:Iterate() do
 		if not self._ShowDifferencesOnly or difference ~= "SourceEqual" then
@@ -72,8 +76,8 @@ function ProjectDetails:_RecreateRows()
 			entry.FilePath.Text = file or "";
 			entry.ScriptPath.Text = script and script:GetFullName() or "";
 			entry.Parent = self._Frame.Scroller;
-			entry.LayoutOrder = i;
-			entry.BackgroundColor3 = LIST_BACKGROUND_COLORS[i % 2]
+			entry.LayoutOrder = j;
+			entry.BackgroundColor3 = LIST_BACKGROUND_COLORS[j % 2]
 			buttons.Pull.OnClick = function( )
 				self.SyncCallback("pull", self._Project, file or script);
 			end;
@@ -86,14 +90,14 @@ function ProjectDetails:_RecreateRows()
 				buttons.Push.Enabled = false;
 			end
 			self._FileGuis[#self._FileGuis + 1] = entry;
-			i = i + 1;
+			j = j + 1;
 		end
 	end
 	local function GetRequiredHeight(first, last)
 		if not first or not last then return 0; end
 		return (last.AbsolutePosition - first.AbsolutePosition + last.AbsoluteSize).y
 	end
-	self._Frame.Scroller.CanvasSize = UDim2.new(0, 0, 0, GetRequiredHeight(self._FileGuis[1], self._FileGuis[#self._FileGuis]));
+	self._Frame.Scroller.CanvasSize = UDim2.new(0, 0, 0, GetRequiredHeight(self._Frame.Scroller.SyncHelp, self._FileGuis[#self._FileGuis]));
 end
 
 function ProjectDetails.new(ps, syncMode)
@@ -105,6 +109,8 @@ function ProjectDetails.new(ps, syncMode)
 	self._ShowDifferencesOnly = syncMode;
 	if syncMode then
 		self._Buttons.AutoSync.Button:Destroy();
+		self._Buttons.Delete.Button:Destroy();
+		self._Frame.Scroller.SyncHelp.Visible = true;
 		for i, v in pairs({"Refresh", "Push", "Pull"}) do
 			self._Buttons[v].Button.Position = self._Buttons[v].Button.Position + UDim2.new(0, 34, 0, 0);
 		end
@@ -120,6 +126,9 @@ function ProjectDetails.new(ps, syncMode)
 	end;
 	self._Buttons.Push.OnClick = function()
 		self.SyncCallback("push", self._Project);
+	end;
+	self._Buttons.Delete.OnClick = function()
+		self.DeleteCallback(self._Project);
 	end;
 	self._Frame.Header.Title.Text = ps.Remote;
 	self._Maid.ProjectSyncChanged = ps.ProjectSync.Changed:Connect(function(property)

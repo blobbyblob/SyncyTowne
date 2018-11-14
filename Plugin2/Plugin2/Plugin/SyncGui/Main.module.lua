@@ -59,6 +59,8 @@ Main.Get.ConnectionStatus = "_ConnectionStatus";
 Main.Set.ConnectionStatus = "_ConnectionStatus";
 Main.Get.RefreshCallback = "_RefreshCallback";
 Main.Set.RefreshCallback = "_RefreshCallback";
+Main.Get.DeleteCallback = "_DeleteCallback";
+Main.Set.DeleteCallback = "_DeleteCallback";
 
 function Main:_CreateAllProjects(pm)
 	for i, v in pairs(self._ProjectGuis) do
@@ -106,6 +108,10 @@ function Main:_CreateAllProjects(pm)
 			local pd = ProjectDetails.new(project, false);
 			pd.SyncCallback = self._SyncCallback;
 			pd.RefreshCallback = self._RefreshCallback;
+			pd.DeleteCallback = function(...)
+				self._CloseSubpage();
+				self._DeleteCallback(...);
+			end;
 			self:_SetSubpage(pd, "Project Details");
 		end);
 	end
