@@ -8,6 +8,7 @@ Properties:
 			{ Name = "<filename>",    Type = "file",   FullPath = "<full path>", Parent = <parent>, Hash = "<hash>" }
 			{ Name = "<folder name>", Type = "folder", FullPath = "<full path>", Parent = <parent>, Children = {<children indexed by name>} }
 		Note that in the case of a folder, children are recursively one of the aforementioned two types.
+	Connected (read-only): when true, we are successfully talking to the server.
 
 Events:
 	Changed(filepath): fires when any file changes (be it added, removed, etc.)
@@ -22,7 +23,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "FilesystemModel: ", false);
+local Debug = Utils.new("Log", "FilesystemModel: ", true);
 local ServerRequests = require(script.Parent.Parent.ServerRequests);
 local Helpers = require(script.Parent.Helpers);
 
@@ -103,19 +104,24 @@ end
 --[[ @brief Queries the current state of the file hierarchy on the remote.
 --]]
 function FilesystemModel:_QueryServer()
-	local _, parseResult = assert(ServerRequests.parse{
+	local success, parseResult = ServerRequests.parse{
 		File = self._Root;
 		Depth = 0;
 		Hash = true;
-	});
-	local parseResult = SimplifyParseResult(parseResult.Tree);
-	local root = { Name = "<root>"; Type = "folder"; FullPath = ""; Children = {}; };
-	for _, line in pairs(parseResult) do
-		Debug("Path: %s", line.Path);
-		local path, file = SplitFilePath(RemoveRoot(line.Path, self._Root));
-		AddEntryToTree(root, path, file, { Name = file; Type = "file"; Hash = line.Hash});
+	};
+	if success then
+		local parseResult = SimplifyParseResult(parseResult.Tree);
+		local root = { Name = "<root>"; Type = "folder"; FullPath = ""; Children = {}; };
+		for _, line in pairs(parseResult) do
+			Debug("Path: %s", line.Path);
+			local path, file = SplitFilePath(RemoveRoot(line.Path, self._Root));
+			AddEntryToTree(root, path, file, { Name = file; Type = "file"; Hash = line.Hash});
+		end
+		self._Tree = root;
+		self._Connected = true;
+	else
+		self._Connected = false;
 	end
-	self._Tree = root;
 end
 
 --[[ @brief Converts the FileChange parameter provided by the server into something more usable.
@@ -160,7 +166,8 @@ function FilesystemModel:_StartWatching()
 	self._PollKey = response.ID;
 	local key = response.ID;
 	spawn(function()
-		while key == self._PollKey do
+		failures = 0;
+		while key == self._PollKey or failures > 2 do
 			local success, response = ServerRequests.watch_poll{
 				ID = key;
 			};
@@ -170,6 +177,7 @@ function FilesystemModel:_StartWatching()
 			local result = SimplifyWatchPollResult(response.FileChange);
 			Debug("SimplifiedWatchPollResult: %s --> %0t", response.FileChange, result);
 			if result.Mode == "modify" then
+				failures = 0;
 				--Find this object in our tree & update its hash.
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
@@ -180,16 +188,22 @@ function FilesystemModel:_StartWatching()
 				end
 				self._ChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "error" then
+				failures = failures + 1;
 				if result.Message == "ID_NO_LONGER_VALID" then
 					self._PollKey = false; --we implicitly have stopped watching.
+				else
+					Debug("Unexpected error; terminating connection");
+					break;
 				end
 			elseif result.Mode == "add" then
+				failures = 0;
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local entry = { Hash = result.Hash; };
 				AddEntryToTree(self._Tree, path, filename, entry);
 				Debug("New Entry: %t", entry);
 				self._ChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "delete" then
+				failures = 0;
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
 				if obj and obj.Parent then
@@ -198,9 +212,17 @@ function FilesystemModel:_StartWatching()
 				end
 			elseif result.Mode == "timeout" then
 				--Not a big deal! We'll just poll again.
+				failures = 0;
+			elseif result.Mode == "failure" then
+				failures = failures + 1;
 			else
+				failures = failures + 1;
 				Debug("Unexpected mode: %s", result.Mode);
 			end
+		end
+		if key == self._PollKey then
+			self._Connected = false;
+			self._ChangedEvent:Fire("Connected");
 		end
 	end);
 end
