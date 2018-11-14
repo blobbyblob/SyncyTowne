@@ -15,6 +15,23 @@ module.SUFFIX_CONVERT_TO_OBJECT = {
 	Script = function() return Instance.new("Script"); end;
 };
 
+module.SAVEABLE_SERVICES = {
+	'Workspace',
+	'Lighting',
+	'ReplicatedFirst',
+	'ReplicatedStorage',
+	"ServerScriptService",
+	"ServerStorage",
+	"StarterGui",
+	"StarterPack",
+	"StarterPlayer",
+	--Admittedly, I have no idea what sorts of scripts one might want to put in the services below, but maybe someday someone will have a use case.
+	"SoundService",
+	"Chat",
+	"LocalizationService",
+	"TestService",
+};
+
 --[[ @brief Converts a path into directory & filename.
 	@param path The path to split up.
 	@return path The path to the directory containing the file.

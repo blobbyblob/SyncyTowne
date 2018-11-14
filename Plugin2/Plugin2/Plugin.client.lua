@@ -52,5 +52,6 @@ syncGui.DeleteCallback = function(project)
 			break;
 		end
 	end
+	project.ProjectSync:Destroy();
 	pm.Projects = pm.Projects;
 end;

@@ -86,6 +86,10 @@ function ProjectManager:Save(parent, name)
 		local loc = Instance.new("ObjectValue", project);
 		loc.Name = "Local";
 		loc.Value = v.Local;
+		if v.Local == game then
+			local b = Instance.new("BoolValue", loc);
+			b.Name = "game";
+		end
 		--Create a reference (textual) to the remote folder.
 		local rem = Instance.new("StringValue", project);
 		rem.Name = "Remote";
@@ -165,6 +169,9 @@ function ProjectManager.Load(folder)
 		local project = {};
 		local l = sync:FindFirstChild("Local");
 		project.Local = l.Value;
+		if l:FindFirstChild("game") and not project.Local then
+			project.Local = game;
+		end
 		local r = sync:FindFirstChild("Remote");
 		project.Remote = r.Value;
 		local except = sync:FindFirstChild("Exceptions");

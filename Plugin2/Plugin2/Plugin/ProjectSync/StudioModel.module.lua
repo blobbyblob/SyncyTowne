@@ -195,11 +195,17 @@ function StudioModel.fromInstance(root)
 	self._Root = root;
 	--Find all Scripts, ModuleScripts, or LocalScripts in root and add them to the tree.
 	local function recurse(node)
-		if SUFFIXES[node.ClassName] then
-			table.insert(self._Objects, { Object = node; Hash = GetHash(node); });
-		end
-		for i, v in pairs(node:GetChildren()) do
-			recurse(v);
+		if node == game then
+			for i, serviceName in pairs(Helpers.SAVEABLE_SERVICES) do
+				recurse(game:GetService(serviceName));
+			end
+		elseif node then
+			if SUFFIXES[node.ClassName] then
+				table.insert(self._Objects, { Object = node; Hash = GetHash(node); });
+			end
+			for i, v in pairs(node:GetChildren()) do
+				recurse(v);
+			end
 		end
 	end
 	recurse(root);

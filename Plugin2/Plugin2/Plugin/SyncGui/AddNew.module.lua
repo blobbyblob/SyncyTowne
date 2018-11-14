@@ -24,6 +24,7 @@ local Utils = require(script.Parent.Parent.Utils);
 local Debug = Utils.new("Log", "AddNew: ", true);
 local ProjectSyncHelpers = require(script.Parent.Parent.ProjectSync.Helpers);
 local GetPath = ProjectSyncHelpers.GetPath;
+local SAVEABLE_SERVICES = ProjectSyncHelpers.SAVEABLE_SERVICES;
 local Helpers = require(script.Parent.Helpers);
 
 local ADD_NEW_GUI = script.AddNewContents;
@@ -43,11 +44,20 @@ local function GetFirstScript(root)
 		if TOP_LEVEL_CLASSES[v.ClassName] == "Script" then
 			return GetPath(root, v);
 		end
-		for i, v in pairs(v:GetChildren()) do
-			table.insert(t, v);
+		if v == game then
+			for i, serviceName in pairs(SAVEABLE_SERVICES) do
+				if game:GetService(serviceName) then
+					table.insert(t, game:GetService(serviceName));
+				end
+			end
+		else
+			for i, v in pairs(v:GetChildren()) do
+				table.insert(t, v);
+			end
 		end
 		table.remove(t, 1);
 	end
+	return "";
 end
 
 local function ScrubRemote(text)
@@ -92,13 +102,8 @@ function AddNew.new()
 	local main = self._Frame.Scroller;
 	self._Buttons.SelectLocal.OnClick = function()
 		local selected = Utils.Table.Filter(game:GetService("Selection"):Get(), function(x) return TOP_LEVEL_CLASSES[x.ClassName]; end);
-		self._Local = selected[1];
-		--Update the text to reflect what is selected.
-		if self._Local then
-			main.SelectLocal.Text = "Current Selection: " .. self._Local:GetFullName();
-		else
-			main.SelectLocal.Text = "Select a script/folder, then click this button";
-		end
+		self._Local = selected[1] or game;
+		main.SelectLocal.Text = "Current Selection: " .. self._Local:GetFullName();
 		self:_UpdateExample();
 	end;
 	self._Buttons.SelectLocal.OnClick();
