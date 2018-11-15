@@ -1,5 +1,5 @@
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Helpers: ", true);
+local Debug = Utils.new("Log", "Helpers: ", false);
 local ImageButtonWrapper = require(script.ImageButton);
 
 local module = {}

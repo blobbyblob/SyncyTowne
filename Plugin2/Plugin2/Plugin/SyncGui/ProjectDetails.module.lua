@@ -16,7 +16,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "ProjectDetails: ", true);
+local Debug = Utils.new("Log", "ProjectDetails: ", false);
 local Helpers = require(script.Parent.Helpers);
 
 local PROJECT_DETAILS_GUI = script.ProjectDetailsContents;

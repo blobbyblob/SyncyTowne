@@ -19,7 +19,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "SubscreenWrapper: ", true);
+local Debug = Utils.new("Log", "SubscreenWrapper: ", false);
 local Helpers = require(script.Parent.Helpers);
 
 local SUBSCREEN_WRAPPER = script.SubscreenWrapper;

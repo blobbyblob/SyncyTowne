@@ -16,7 +16,7 @@ When pulling, FilesystemModel is converted to a StudioModel and they are synced 
 --do return; end
 
 local Utils = require(script.Parent.Utils);
-local Debug = Utils.new("Log", "Plugin: ", true);
+local Debug = Utils.new("Log", "Plugin: ", false);
 local SyncGui = require(script.SyncGui);
 local ProjectManager = require(script.ProjectManager);
 

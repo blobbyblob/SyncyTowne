@@ -28,7 +28,7 @@ Free Functions:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "SyncGui: ", true);
+local Debug = Utils.new("Log", "SyncGui: ", false);
 local ProjectManager = require(script.Parent.ProjectManager);
 local Main = require(script.Main);
 --local AddNew = require(script.AddNew);

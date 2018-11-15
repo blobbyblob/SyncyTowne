@@ -22,7 +22,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Main: ", true);
+local Debug = Utils.new("Log", "Main: ", false);
 local AddNew = require(script.Parent.AddNew);
 local SubscreenWrapper = require(script.Parent.SubscreenWrapper);
 local ProjectDetails = require(script.Parent.ProjectDetails);

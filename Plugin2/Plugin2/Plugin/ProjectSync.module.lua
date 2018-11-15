@@ -28,7 +28,7 @@ TODO: wire up the changed event properly. We'll have to update DifferenceCount a
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "ProjectSync: ", true);
+local Debug = Utils.new("Log", "ProjectSync: ", false);
 local Compare = require(script.Compare).Compare;
 local FilesystemModel = require(script.FilesystemModel);
 local StudioModel = require(script.StudioModel);

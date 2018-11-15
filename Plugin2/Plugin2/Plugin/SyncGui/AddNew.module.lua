@@ -21,7 +21,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "AddNew: ", true);
+local Debug = Utils.new("Log", "AddNew: ", false);
 local ProjectSyncHelpers = require(script.Parent.Parent.ProjectSync.Helpers);
 local GetPath = ProjectSyncHelpers.GetPath;
 local SAVEABLE_SERVICES = ProjectSyncHelpers.SAVEABLE_SERVICES;
