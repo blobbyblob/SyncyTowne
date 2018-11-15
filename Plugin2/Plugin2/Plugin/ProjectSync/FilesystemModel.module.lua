@@ -35,12 +35,17 @@ local FilesystemModel = Utils.new("Class", "FilesystemModel");
 
 FilesystemModel._Root = false;
 FilesystemModel._Tree = false;
-FilesystemModel._ChangedEvent = false;
+FilesystemModel._FileChangedEvent = false;
+FilesystemModel._PropertyChangedEvent = false; --Oops. Changed used to be used for file changes, despite that property changes are canonical for the "Changed" event.
 FilesystemModel._PollKey = false;
+FilesystemModel._Connected = false;
 
 FilesystemModel.Get.Root = "_Root";
 FilesystemModel.Get.Tree = "_Tree";
-FilesystemModel.Get.Changed = function(self) return self._ChangedEvent.Event; end
+FilesystemModel.Get.Changed = function(self) Utils.Log.Warning("Use FileChanged, not Changed"); return self._FileChangedEvent.Event; end
+FilesystemModel.Get.FileChanged = function(self) return self._FileChangedEvent.Event; end
+FilesystemModel.Get.PropertyChanged = function(self) return self._PropertyChangedEvent.Event; end
+FilesystemModel.Get.Connected = "_Connected";
 
 --[[ @brief Takes input returned by the `parse` operation and makes it more usable (tables and such).
 	@param tree A set of data where each line has a file path & a hash.
@@ -119,6 +124,7 @@ function FilesystemModel:_QueryServer()
 		end
 		self._Tree = root;
 		self._Connected = true;
+		self._PropertyChangedEvent:Fire("Connected");
 	else
 		self._Connected = false;
 	end
@@ -131,7 +137,9 @@ end
 	@return[3] A table of the form { Mode = "modify|add|delete"; FilePath = "path"; Hash = "hash"; }
 --]]
 local function SimplifyWatchPollResult(text)
-	if text == "" then
+	if text == nil then
+		return { Mode = "failure"; };
+	elseif text == "" then
 		return {
 			Mode = "timeout";
 		};
@@ -160,14 +168,23 @@ function FilesystemModel:_StartWatching()
 	if self._PollKey then
 		self:_StopWatching();
 	end
-	local _, response = assert(ServerRequests.watch_start{
+	local success, response = ServerRequests.watch_start{
 		File = self._Root;
-	});
+	};
+	if not success then
+		if self._Connected ~= false then
+			self._Connected = false;
+			self._PropertyChangedEvent:Fire("Connected");
+			Debug("Failed to start watching remote");
+		end
+		return;
+	end
 	self._PollKey = response.ID;
 	local key = response.ID;
 	spawn(function()
-		failures = 0;
-		while key == self._PollKey or failures > 2 do
+		local failures = 0;
+		while key == self._PollKey and failures <= 2 do
+			failures = failures + 1;
 			local success, response = ServerRequests.watch_poll{
 				ID = key;
 			};
@@ -186,9 +203,8 @@ function FilesystemModel:_StartWatching()
 				else
 					AddEntryToTree(self._Tree, path, filename, { Hash = result.Hash; });
 				end
-				self._ChangedEvent:Fire(path .. "/" .. filename);
+				self._FileChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "error" then
-				failures = failures + 1;
 				if result.Message == "ID_NO_LONGER_VALID" then
 					self._PollKey = false; --we implicitly have stopped watching.
 				else
@@ -201,28 +217,26 @@ function FilesystemModel:_StartWatching()
 				local entry = { Hash = result.Hash; };
 				AddEntryToTree(self._Tree, path, filename, entry);
 				Debug("New Entry: %t", entry);
-				self._ChangedEvent:Fire(path .. "/" .. filename);
+				self._FileChangedEvent:Fire(path .. "/" .. filename);
 			elseif result.Mode == "delete" then
 				failures = 0;
 				local path, filename = SplitFilePath(RemoveRoot(result.FilePath, self._Root));
 				local obj = GetEntryInTree(self._Tree, path, filename);
 				if obj and obj.Parent then
 					obj.Parent.Children[obj.Name] = nil;
-					self._ChangedEvent:Fire(path .. "/" .. filename);
+					self._FileChangedEvent:Fire(path .. "/" .. filename);
 				end
 			elseif result.Mode == "timeout" then
 				--Not a big deal! We'll just poll again.
 				failures = 0;
 			elseif result.Mode == "failure" then
-				failures = failures + 1;
 			else
-				failures = failures + 1;
 				Debug("Unexpected mode: %s", result.Mode);
 			end
 		end
 		if key == self._PollKey then
 			self._Connected = false;
-			self._ChangedEvent:Fire("Connected");
+			self._PropertyChangedEvent:Fire("Connected");
 		end
 	end);
 end
@@ -250,7 +264,8 @@ end
 --]]
 function FilesystemModel.new()
 	local self = setmetatable({}, FilesystemModel.Meta);
-	self._ChangedEvent = Instance.new("BindableEvent");
+	self._FileChangedEvent = Instance.new("BindableEvent");
+	self._PropertyChangedEvent = Instance.new("BindableEvent");
 	return self;
 end
 

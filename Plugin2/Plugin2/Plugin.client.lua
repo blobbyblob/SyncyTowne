@@ -32,7 +32,13 @@ local syncGui = SyncGui.new(pm);
 syncGui.Frame.Parent = gui;
 syncGui.RefreshCallback = function(project)
 	Debug("RefreshCallback(%s) called", project);
-	project.ProjectSync:CheckSync();
+	if project then
+		project.ProjectSync:CheckSync();
+	else
+		for i, project in pairs(pm.Projects) do
+			project.ProjectSync:CheckSync();
+		end
+	end
 end;
 syncGui.SyncCallback = function(mode, project, script)
 	Debug("SyncCallback(%s, %s, %s) called", mode, project, script);

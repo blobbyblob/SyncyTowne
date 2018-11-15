@@ -28,7 +28,7 @@ TODO: wire up the changed event properly. We'll have to update DifferenceCount a
 --]]
 
 local Utils = require(script.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "ProjectSync: ", false);
+local Debug = Utils.new("Log", "ProjectSync: ", true);
 local Compare = require(script.Compare).Compare;
 local FilesystemModel = require(script.FilesystemModel);
 local StudioModel = require(script.StudioModel);
@@ -44,6 +44,7 @@ ProjectSync._DifferenceCount = 0;
 ProjectSync._AutoSync = false;
 ProjectSync.PullingWillCreateFolders = false;
 ProjectSync.PushingWillDeleteFiles = false;
+ProjectSync._Connected = false;
 
 --Internal structures
 ProjectSync._Maid = false;
@@ -60,6 +61,7 @@ ProjectSync.Get.Project = "_Project";
 ProjectSync.Get.DifferenceCount = "_DifferenceCount";
 ProjectSync.Get.AutoSync = "_AutoSync";
 ProjectSync.Get.Changed = function(self) return self._ChangedEvent.Event; end;
+ProjectSync.Get.Connected = "_Connected";
 
 --[[ @brief Forces a refresh of the models.
 --]]
@@ -69,6 +71,9 @@ function ProjectSync:CheckSync()
 	self._StudioModel = StudioModel.fromInstance(self._Project.Local);
 	self._Maid:SetTask('_StudioModel', self._StudioModel);
 	local function CheckDifferenceCount(self)
+		if not self._FilesystemModel.Connected then
+			return;
+		end
 		local differenceCount = 0;
 		for i, diff in pairs(Compare(self._FilesystemModel, self._StudioModel)) do
 			if diff.Comparison ~= "synced" then
@@ -82,10 +87,23 @@ function ProjectSync:CheckSync()
 		end
 	end
 	CheckDifferenceCount(self);
-	self._Maid.FilesystemChanged = self._FilesystemModel.Changed:Connect(function(file)
+	self._Maid.FilesystemFileChanged = self._FilesystemModel.FileChanged:Connect(function(file)
 		CheckDifferenceCount(self);
 		if tick() > self._RemoteScreenTime then
 			self._ScriptChangeEvent:Fire("Remote", file);
+		end
+	end);
+	Debug("Filesystem Connected? %s", self._FilesystemModel.Connected);
+	if self._Connected ~= self._FilesystemModel.Connected then
+		self._Connected = self._FilesystemModel.Connected;
+		self._ChangedEvent:Fire("Connected");
+	end
+	self._Maid.FilesystemChanged = self._FilesystemModel.PropertyChanged:Connect(function(property)
+		if property == "Connected" then
+			if self._Connected ~= self._FilesystemModel.Connected then
+				self._Connected = self._FilesystemModel.Connected;
+				self._ChangedEvent:Fire("Connected");
+			end
 		end
 	end);
 	self._Maid.StudioChanged = self._StudioModel.Changed:Connect(function(script)
@@ -179,6 +197,11 @@ local COMPARISON_MAP = {
 	@return A function which, for each invocation, will return a FilePath, ScriptInStudio, DifferenceType for each script maintained in this project. DifferenceType can be "fileOnly", "scriptOnly", "synced", or "desynced".
 --]]
 function ProjectSync:Iterate()
+	if not self.Connected then
+		return function()
+			
+		end
+	end
 	local diff = Compare(self._FilesystemModel, self._StudioModel);
 	local iter, inv, i = pairs(diff);
 	local diff;

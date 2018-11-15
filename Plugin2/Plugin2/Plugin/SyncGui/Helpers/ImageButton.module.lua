@@ -97,10 +97,10 @@ local COLOR_CONSTANTS = {
 
 	CLICKED = Color3.fromRGB(219, 219, 219); --The mouse is depressed on the button at the moment.
 
-	HOVERED_SELECTED = Color3.fromRGB(229, 239, 254); --The mouse is hovering over a selected object.
+	HOVERED_SELECTED = Color3.fromRGB(147, 190, 255); --The mouse is hovering over a selected object.
 	HOVERED_DESELECTED = Color3.fromRGB(228, 238, 254); --the mouse is hovering over a non-selected object.
 
-	SELECTED = Color3.fromRGB(219, 219, 219); --selected, but not hovering or clicked.
+	SELECTED = Color3.fromRGB(181, 210, 255); --selected, but not hovering or clicked.
 	DISABLED_SELECTED = Color3.fromRGB(220, 220, 220);
 	DISABLED_DESELECTED = Color3.fromRGB(230, 230, 230);
 };

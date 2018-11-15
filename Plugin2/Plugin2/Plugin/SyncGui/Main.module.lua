@@ -184,6 +184,39 @@ function Main:_SetSubpage(subpage, title)
 	end;
 end
 
+function Main:_WatchConnections(pm)
+	local function AggregateConnectedStatus()
+		local connected, disconnected = 0, 0;
+		for i, project in pairs(pm.Projects) do
+			if project.ProjectSync.Connected then
+				connected = connected + 1;
+			else
+				disconnected = disconnected + 1;
+			end
+		end
+		Debug("%s projects are connected; %s are disconnected", connected, disconnected);
+		if disconnected == 0 then
+			--We're good. Or we're trivially good (nothing connected because we don't have any projects).
+			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(17, 0);
+		elseif connected ~= 0 then
+			--We're somewhat good. Something's disconnected.
+			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(34, 0);
+		elseif connected == 0 then
+			--We're very bad. Everything's disconnected.
+			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(34, 0);
+		end
+	end
+	self._Maid.Connections = Utils.new("Maid");
+	for i, project in pairs(pm.Projects) do
+		self._Maid.Connections[project] = project.ProjectSync.Changed:Connect(function(property)
+			if property == "Connected" then
+				AggregateConnectedStatus();
+			end
+		end);
+	end
+	AggregateConnectedStatus();
+end
+
 function Main.new(pm)
 	local self = setmetatable({}, Main.Meta);
 	self._Frame, self._Buttons = FixImageButtons(MAIN_GUI:Clone(), self._Maid);
@@ -191,9 +224,11 @@ function Main.new(pm)
 	self._ProjectGuis = {};
 
 	self:_CreateAllProjects(pm);
+	self:_WatchConnections(pm);
 	self._Maid.ProjectManagerChanged = pm.Changed:Connect(function(property)
 		if property == "Projects" then
 			self:_CreateAllProjects(pm);
+			self:_WatchConnections(pm);
 		end
 	end);
 	self._Buttons.Add.OnClick = function()
@@ -208,6 +243,9 @@ function Main.new(pm)
 			});
 			pm.Projects = pm.Projects;
 		end;
+	end
+	self._Buttons.Refresh.OnClick = function()
+		self._RefreshCallback();
 	end
 	return self;
 end
