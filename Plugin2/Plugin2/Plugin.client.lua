@@ -22,6 +22,7 @@ local ProjectManager = require(script.ProjectManager);
 
 local gui = plugin:CreateDockWidgetPluginGui("SyncyTowne2", DockWidgetPluginGuiInfo.new());
 gui.Title = "SyncyTowne";
+gui.Name = "SyncyTowne";
 
 local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData"));
 pm.Changed:Connect(function()
