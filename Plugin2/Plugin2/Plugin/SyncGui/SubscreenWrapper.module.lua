@@ -57,6 +57,7 @@ function SubscreenWrapper.new()
 	buttons.Back.OnClick = function()
 		self._ExitCallback();
 	end;
+	buttons.Back.ToolTip = "Exit";
 	self._Maid.Frame = self._Frame;
 	return self;
 end

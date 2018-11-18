@@ -23,6 +23,21 @@ local PROJECT_DETAILS_GUI = script.ProjectDetailsContents;
 local SCRIPT_ENTRY = PROJECT_DETAILS_GUI.Scroller.ScriptEntry;
 SCRIPT_ENTRY.Parent = nil;
 
+local TOOL_TIPS = {
+	AutoSync_Enabled = "Start auto-sync.";
+	AutoSync_Disabled = "Cannot start auto-sync; files must be fully synced first.";
+	ProjectPush_Enabled = "Update filesystem from studio (all scripts)";
+	ProjectPush_Disabled = "Cannot push; all files already synced";
+	ProjectPull_Enabled = "Update studio from filesystem (all scripts)";
+	ProjectPull_Disabled = "Cannot pull; all files already synced";
+	ScriptPush_Enabled = "Update filesystem from studio (this script only)";
+	ScriptPush_Disabled = "Cannot push; file already synced";
+	ScriptPull_Enabled = "Update studio from filesystem (this script only)";
+	ScriptPull_Disabled = "Cannot pull; file already synced";
+	Delete = "Stop tracking this project (filesystem will be unaffected).";
+	Refresh = "Refresh. Sometimes solves mismatches.";
+};
+
 local LIST_BACKGROUND_COLORS = {
 	[0] = Color3.fromRGB(199, 246, 255);
 	Color3.fromRGB(255, 255, 255);
@@ -60,6 +75,9 @@ function ProjectDetails:_UpdateButtons()
 	self._Buttons.AutoSync.Enabled = not differenceExists;
 	self._Buttons.Push.Enabled = differenceExists;
 	self._Buttons.Pull.Enabled = differenceExists;
+	self._Buttons.AutoSync.ToolTip = self._Buttons.AutoSync.Enabled and TOOL_TIPS.AutoSync_Enabled or TOOL_TIPS.AutoSync_Disabled;
+	self._Buttons.Push.ToolTip = self._Buttons.Push.Enabled and TOOL_TIPS.ProjectPush_Enabled or TOOL_TIPS.ProjectPush_Disabled;
+	self._Buttons.Pull.ToolTip = self._Buttons.Pull.Enabled and TOOL_TIPS.ProjectPull_Enabled or TOOL_TIPS.ProjectPull_Disabled;
 	self:_RecreateRows();
 end
 
@@ -88,6 +106,11 @@ function ProjectDetails:_RecreateRows()
 			if difference == "SourceEqual" then
 				buttons.Pull.Enabled = false;
 				buttons.Push.Enabled = false;
+				buttons.Pull.ToolTip = TOOL_TIPS.ScriptPull_Disabled;
+				buttons.Push.ToolTip = TOOL_TIPS.ScriptPush_Disabled;
+			else
+				buttons.Pull.ToolTip = TOOL_TIPS.ScriptPull_Enabled;
+				buttons.Push.ToolTip = TOOL_TIPS.ScriptPush_Enabled;
 			end
 			self._FileGuis[#self._FileGuis + 1] = entry;
 			j = j + 1;
@@ -112,9 +135,12 @@ function ProjectDetails.new(ps, syncMode)
 		self._Buttons.Delete.Button:Destroy();
 		self._Frame.Scroller.SyncHelp.Visible = true;
 		for i, v in pairs({"Refresh", "Push", "Pull"}) do
-			self._Buttons[v].Button.Position = self._Buttons[v].Button.Position + UDim2.new(0, 34, 0, 0);
+			local shift = v == "Refresh" and 34 or 68;
+			self._Buttons[v].Button.Position = self._Buttons[v].Button.Position + UDim2.new(0, shift, 0, 0);
 		end
 	end
+	self._Buttons.Delete.ToolTip = TOOL_TIPS.Delete;
+	self._Buttons.Refresh.ToolTip = TOOL_TIPS.Refresh;
 	self._Buttons.AutoSync.OnClick = function()
 		self.SyncCallback("sync", self._Project, not self._Project.ProjectSync.AutoSync);
 	end;

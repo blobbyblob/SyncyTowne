@@ -109,7 +109,11 @@ function StudioModel:_HookUpConnections()
 		end);
 	end
 	self._Cxns.DescendantAdded = self._Root.DescendantAdded:Connect(function(descendant)
-		if SUFFIXES[descendant.ClassName] then
+		if self._Root == game and descendant.Parent == self._Root then
+			--If we read ClassName, we'll get an error. So, we should treat these cases specially.
+			--Fortunately, anything we save can't be parented directly to game (yet), so we can
+			--ignore this case for now. :)
+		elseif SUFFIXES[descendant.ClassName] then
 			table.insert(self._Objects, { Object = descendant; Hash = GetHash(descendant); });
 			ListenTo(descendant);
 		end

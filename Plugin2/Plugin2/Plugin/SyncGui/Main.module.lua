@@ -51,6 +51,7 @@ Main._CloseSubpage = function() end;
 
 Main._Maid = false;
 Main._ProjectGuis = {};
+Main._Buttons = {};
 
 Main.Get.Frame = "_Frame";
 Main.Get.SyncCallback = "_SyncCallback";
@@ -76,6 +77,7 @@ function Main:_CreateAllProjects(pm)
 		g.BackgroundColor3 = LIST_BACKGROUND_COLORS[(i-1)%2];
 		g.LayoutOrder = i;
 		g.Parent = self._Frame.ScrollContent;
+		buttons.Sync.ToolTip = "Start auto-syncing this project";
 		buttons.Sync.OnClick = function()
 			--If the project has any differences, first open the sync screen. Otherwise, just start auto-sync.
 			if project.ProjectSync.DifferenceCount > 0 then
@@ -198,12 +200,15 @@ function Main:_WatchConnections(pm)
 		if disconnected == 0 then
 			--We're good. Or we're trivially good (nothing connected because we don't have any projects).
 			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(17, 0);
+			self._Buttons.Refresh.ToolTip = "Connected!\nClick to retry.";
 		elseif connected ~= 0 then
 			--We're somewhat good. Something's disconnected.
 			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(34, 0);
+			self._Buttons.Refresh.ToolTip = "Disconnected!\nClick to retry.";
 		elseif connected == 0 then
 			--We're very bad. Everything's disconnected.
 			self._Frame.TopBar.Refresh.CenteredImage.ImageRectOffset = Vector2.new(34, 0);
+			self._Buttons.Refresh.ToolTip = "Disconnected!\nClick to retry.";
 		end
 	end
 	self._Maid.Connections = Utils.new("Maid");
@@ -247,6 +252,9 @@ function Main.new(pm)
 	self._Buttons.Refresh.OnClick = function()
 		self._RefreshCallback();
 	end
+	self._Buttons.Add.ToolTip = "Add new project";
+	self._Buttons.Settings.Enabled = false;
+	self._Buttons.Settings.ToolTip = "Special configurations not yet implemented";
 	return self;
 end
 

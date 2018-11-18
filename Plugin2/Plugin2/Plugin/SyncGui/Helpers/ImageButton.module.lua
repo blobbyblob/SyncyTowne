@@ -30,9 +30,11 @@ ImageButton._Selected = false;
 ImageButton._Enabled = true;
 ImageButton.Invariant = false;
 ImageButton._HoveredEvent = false;
+ImageButton.ToolTip = "";
 
 ImageButton._Hovered = false;
 ImageButton._Clicked = false;
+ImageButton._Maid = false;
 
 function ImageButton.Get:Hovered()
 	return self._HoveredEvent.Event;
@@ -49,11 +51,74 @@ function ImageButton.Set:Enabled(v)
 	self:_UpdateButtonVisual();
 end
 
+local TOOL_TIP = Instance.new("TextLabel");
+TOOL_TIP.Name = "ToolTip";
+TOOL_TIP.Size = UDim2.new(0, 160, 0, 40);
+TOOL_TIP.Archivable = false;
+TOOL_TIP.BackgroundColor3 = Color3.fromRGB(228, 238, 254);
+TOOL_TIP.BorderColor3 = Color3.fromRGB(0, 0, 0);
+TOOL_TIP.BackgroundTransparency = 0;
+TOOL_TIP.TextColor3 = Color3.fromRGB(0, 0, 0);
+TOOL_TIP.TextWrapped = true;
+
+--[[ @brief Gets the first LayerCollector ancestor and returns it.
+	@param gui The GUI whose ancestor we want to find.
+	@return The first ancestor LayerCollector, or nil if none could be found.
+--]]
+local function GetAncestorLayerCollector(gui)
+	while gui and not gui:IsA("LayerCollector") do
+		gui = gui.Parent;
+	end
+	return gui;
+end
+
+--[[ @brief Gets the location to place the ToolTip.
+
+	This places the tooltip to the upper right corner of the mouse, unless doing so would result in it going off-screen.
+	@param pos A Vector2 or Vector3 indicating where we should approximately locate the ToolTip.
+	@param parent The layer collector that holds this image button.
+--]]
+local function GetToolTipLocation(pos, parent)
+	local xAdjust = 5;
+	local yAdjust = -TOOL_TIP.Size.Y.Offset - 5;
+	if pos.x + xAdjust > parent.AbsoluteSize.x - TOOL_TIP.Size.X.Offset and pos.x > (parent.AbsoluteSize.x - pos.x) then
+		xAdjust = -TOOL_TIP.Size.X.Offset - 5;
+	end
+	if (pos.y + yAdjust) < 0 and pos.y < (parent.AbsoluteSize.y - pos.y) then
+		yAdjust = 5;
+	end
+	return UDim2.new(0, pos.x + xAdjust, 0, pos.y + yAdjust);
+end
+
 function ImageButton:_HookUpListeners()
 	self.Button.InputBegan:connect(function(io)
 		if io.UserInputType == Enum.UserInputType.MouseMovement then
 			self._Hovered = true;
 			self:_UpdateButtonVisual();
+			if self.ToolTip and self.ToolTip ~= "" then
+				TOOL_TIP.Text = self.ToolTip;
+				--TODO: size TOOL_TIP properly for its text contents.
+				local parent = GetAncestorLayerCollector(self.Button);TOOL_TIP.Position = GetToolTipLocation(io.Position, parent);
+				TOOL_TIP.Parent = nil;
+				local removeOnCleanup = true;
+				self._Maid.ToolTipMove = self.Button.InputChanged:Connect(function(io)
+					TOOL_TIP.Position = GetToolTipLocation(io.Position, parent);
+				end);
+				self._Maid.ToolTipParentChanged = TOOL_TIP:GetPropertyChangedSignal("Parent"):Connect(function()
+					if TOOL_TIP.Parent ~= parent then
+						removeOnCleanup = false;
+					end
+				end);
+				self._Maid.ToolTipCleanup = function()
+					--Debug("Attempting to clean up tooltip; parent matches expected? %s; remove on cleanup? %s", TOOL_TIP.Parent == parent, removeOnCleanup);
+					if TOOL_TIP.Parent == parent and removeOnCleanup then
+						TOOL_TIP.Parent = nil;
+					end
+					self._Maid.ToolTipParentChanged = nil;
+					self._Maid.ToolTipMove = nil;
+				end;
+				TOOL_TIP.Parent = parent;
+			end
 			self._HoveredEvent:Fire(self._Hovered);
 		end
 	end)
@@ -61,6 +126,7 @@ function ImageButton:_HookUpListeners()
 		if io.UserInputType == Enum.UserInputType.MouseMovement then
 			self._Hovered = false;
 			self:_UpdateButtonVisual();
+			self._Maid.ToolTipCleanup = nil;
 			self._HoveredEvent:Fire(self._Hovered);
 		end
 	end)
@@ -162,6 +228,7 @@ function ImageButton.new(type)
 	b.AutoButtonColor = false;
 	self.Invariant = self;
 	self.Button = b;
+	self._Maid = Utils.new("Maid");
 	self:_HookUpListeners();
 	self:_UpdateButtonVisual();
 	return self;
