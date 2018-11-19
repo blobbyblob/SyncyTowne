@@ -1,1 +1,1 @@
-return require(game.ReplicatedStorage.Utils:Clone());
+return require(script.Parent.Parent.Utils);
