@@ -60,18 +60,20 @@ end
 function StudioModel:_HookUpConnections()
 	local function ListenTo(obj)
 		--Watch for name changes for all ancestors.
-		local r = obj.Parent;
-		while r ~= self._Root do
-			if self._Cxns.NameChange[r] then
-				break;
-			else
-				self._Cxns.NameChange[r] = r:GetPropertyChangedSignal("Name"):Connect(function()
-					if r:IsDescendantOf(self._Root) then
-						self._ChangedEvent:Fire(obj);
-					else
-						self._Cxns.NameChange[r] = nil;
-					end
-				end);
+		if obj ~= self._Root then
+			local r = obj.Parent;
+			while r ~= self._Root do
+				if self._Cxns.NameChange[r] then
+					break;
+				else
+					self._Cxns.NameChange[r] = r:GetPropertyChangedSignal("Name"):Connect(function()
+						if r:IsDescendantOf(self._Root) then
+							self._ChangedEvent:Fire(obj);
+						else
+							self._Cxns.NameChange[r] = nil;
+						end
+					end);
+				end
 			end
 		end
 		local entry;

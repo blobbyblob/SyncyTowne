@@ -199,8 +199,8 @@ end
 			Model (Name = "foo")
 				Model (Name = "bar")
 					Script (Name = "baz")
-		GetPath(workspace.foo, workspace.foo.bar.baz) -> "foo.bar.baz.server.lua";
-	Take note that foo is _included_ in the path.
+		GetPath(workspace.foo, workspace.foo.bar.baz) -> "bar/baz.server.lua";
+	Take note that foo is _excluded_ from the path.
 
 	@param root The root to start descending from.
 	@param script The script to stop at.
@@ -208,13 +208,22 @@ end
 --]]
 function module.GetPath(root, script)
 	Utils.Log.Assert(script == root or script:IsDescendantOf(root), "script %s expected to be descendant of root %s", script:GetFullName(), root:GetFullName());
+	local originalScript = script;
 	local suffix = module.SUFFIXES[script.ClassName];
-	local s = {script.Name .. (suffix or "")};
-	while script ~= root and script ~= nil do
+	local s;
+	if root == script then
+		s = {script.Name .. ".parent" .. (suffix or "")};
+	else
+		s = {script.Name .. (suffix or "")};
 		script = script.Parent;
-		table.insert(s, 1, script.Name);
 	end
-	return table.concat(s, "/");
+	while script ~= root and script ~= nil do
+		table.insert(s, 1, script.Name);
+		script = script.Parent;
+	end
+	local fullPath = table.concat(s, "/");
+	Debug("GetPath(%s, %s) = %s", root:GetFullName(), originalScript:GetFullName(), fullPath);
+	return fullPath;
 end
 
 --[[ @brief Returns a script given its path and the root object.

@@ -5,7 +5,7 @@ Contains a function to compare a FilesystemModel against a StudioModel.
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Compare: ", false);
+local Debug = Utils.new("Log", "Compare: ", true);
 local Helpers = require(script.Parent.Helpers);
 local StudioModel = require(script.Parent.StudioModel);
 local ServerRequests = require(script.Parent.Parent.ServerRequests);
@@ -35,14 +35,15 @@ local function CreateScript(file, root, prefix)
 	local class, name = Helpers.GetSuffix(filename);
 	local obj = Helpers.SUFFIX_CONVERT_TO_OBJECT[class]();
 	local success, response = ServerRequests.read{ File = prefix .. file.FullPath; };
+	local newRoot;
 	if success then
 		obj.Source = response.Contents;
 		obj.Name = name;
-		Helpers.AddToRoot(root, directory, name, obj);
+		newRoot = Helpers.AddToRoot(root, directory, name, obj);
 	else
 		Debug("Query failed: %s", response);
 	end
-	return success;
+	return success, newRoot;
 end
 local function CreateFile(script, root, prefix)
 	local path = Helpers.GetPath(root, script);
@@ -113,7 +114,7 @@ function module.Compare(filesystemModel, studioModel)
 				Script = nil;
 				Comparison = "fileOnly";
 				Push = function() DeleteFile(file, prefix); end;
-				Pull = function() CreateScript(file, root, prefix); end;
+				Pull = function() local success, newRoot = CreateScript(file, root, prefix); root = newRoot; end;
 			});
 			table.insert(s, {
 				File = nil;
@@ -126,7 +127,7 @@ function module.Compare(filesystemModel, studioModel)
 			local push, pull = NoOp, NoOp;
 			if comparison == "fileOnly" then
 				push = function() DeleteFile(file, prefix); end
-				pull = function() CreateScript(file, root, prefix); end
+				pull = function() local success, newRoot = CreateScript(file, root, prefix); root = newRoot; end;
 			elseif comparison == "scriptOnly" then
 				push = function() CreateFile(trueScript, root, prefix); end;
 				pull = function() DeleteScript(trueScript); end;
@@ -146,7 +147,7 @@ function module.Compare(filesystemModel, studioModel)
 	return s;
 end
 
-function module.Test()
+local function GoIntoMockMode()
 	ServerRequests = setmetatable({
 			_write = function(arg)
 				return true, {};
@@ -169,6 +170,10 @@ function module.Test()
 		end);
 		return rawget(t, i);
 	end});
+end
+
+function module.TestFolderRoot()
+	GoIntoMockMode();
 	local TEST_FOLDER = Utils.Misc.Create(
 		{	ClassName = "Folder";
 			{	ClassName = "Script";
@@ -191,7 +196,6 @@ function module.Test()
 		}
 	);
 	local tree = Helpers.BuildFakeFilesystemModel([[
-		Folder/
 			Script.server.lua 22
 			Subfolder.server.lua 22
 			Subfolder/
@@ -205,7 +209,7 @@ function module.Test()
 	Debug("%0t", comparison)
 	for i, v in pairs(comparison) do
 		Debug("=================\n%s - %s - %s\n=================", v.Script and v.Script.Object or "nil", v.File and v.File.FullPath or "nil", v.Comparison);
-		v:Pull();
+		v:Push();
 		Debug("Moving on...");
 	end
 	for i, v in pairs(sm.Objects) do
@@ -213,5 +217,25 @@ function module.Test()
 	end
 	sm:Destroy();
 end
+
+function module.TestFileRoot()
+	GoIntoMockMode();
+	local TEST_FOLDER = Utils.Misc.Create(
+		{	ClassName = "Script";
+			Source = 'print("Hello world!")\n';
+		}
+	);
+	local tree = Helpers.BuildFakeFilesystemModel([[
+	]]);
+	tree.Root = "SyncyTowne/server/testdir3";
+	local sm = StudioModel.fromInstance(TEST_FOLDER);
+	local comparison = module.Compare(tree, sm);
+	for i, v in pairs(comparison) do
+		Debug("=================\n%s - %s - %s\n=================", v.Script and v.Script.Object or "nil", v.File and v.File.FullPath or "nil", v.Comparison);
+		v:Push();
+	end
+end
+
+module.Test = module.TestFileRoot;
 
 return module;
