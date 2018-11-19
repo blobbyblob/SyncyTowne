@@ -1,5 +1,5 @@
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Helpers: ", false);
+local Debug = Utils.new("Log", "Helpers: ", true);
 
 local module = {}
 
@@ -132,16 +132,17 @@ end
 --[[ @brief Adds an object as a descendant of some root object by tracing a path.
 	@param root The root of the project.
 	@param path A path to some descendant. If no descendant exists anywhere along this path, folders will be created.
-	@param name The name of the object.
+	@param name The name of the object. This is not meant to have suffixes from Helpers.SUFFIXES, but may have the ".parent" suffix.
 	@param obj The object to insert.
+	@return The new root, in the case that is has changed.
 --]]
 function module.AddToRoot(root, path, name, obj)
 	Debug("AddToRoot(%s, %s, %s) called", path, name, obj);
 	local r = root;
 	local iterator = string.gmatch(path, "[^/]+");
-	iterator();
 	for dir in iterator do
 		if not r:FindFirstChild(dir) then
+			Debug("Folder %s had to be created in %s because it didn't exist", dir, r:GetFullName());
 			local f = Instance.new("Folder");
 			f.Name = dir;
 			f.Parent = r;
@@ -149,14 +150,46 @@ function module.AddToRoot(root, path, name, obj)
 		r = r:FindFirstChild(dir);
 	end
 
-	--If we will blow away a Folder, instead, replace it with our object.
-	if r:FindFirstChild(name) then
-		for i, v in pairs(r:FindFirstChild(name):GetChildren()) do
+	local PARENT_SUFFIX = ".parent";
+	local setNotAdd = false;
+	if name:sub(-#PARENT_SUFFIX) == PARENT_SUFFIX then
+		setNotAdd = true;
+	end
+
+	if setNotAdd then
+		local nameWithoutSuffix = name:sub(1, -#PARENT_SUFFIX - 1);
+		Debug("We are replacing %s, not adding %s as a child", r:GetFullName(), nameWithoutSuffix);
+		obj.Name = nameWithoutSuffix;
+		for i, v in pairs(r:GetChildren()) do
 			v.Parent = obj;
 		end
-		r:FindFirstChild(name).Parent = nil;
+		obj.Parent = r.Parent;
+		r.Parent = nil;
+		if r == root then
+			Debug("We have a new root!");
+			root = obj;
+		else
+			--Things are probably going to go foul if the names don't match. We'll warn, then fix it.
+			--Name mismatch would be something like this:
+			--Folder
+			--    Script.parent.module.lua <-- notice "Script" doesn't match the parent's name, "Folder".
+			if r.Name ~= obj.Name then
+				Utils.Log.Warning("Names do not match! %s/%s has child %s", path, r.Name, obj.Name);
+			end
+		end
+	else
+		Debug("Adding %s as child of %s", obj.Name, r:GetFullName());
+		--If we will blow away a Folder, instead, replace it with our object.
+		if r:FindFirstChild(name) then
+			Debug("%s already has child named %s of class %s, so we will replace it", r.Name, obj.Name, r:FindFirstChild(name).ClassName);
+			for i, v in pairs(r:FindFirstChild(name):GetChildren()) do
+				v.Parent = obj;
+			end
+			r:FindFirstChild(name).Parent = nil;
+		end
+		obj.Parent = r;
 	end
-	obj.Parent = r;
+	return root;
 end
 
 --[[ @brief Gets a path given the root & an object within root. This also tacks on a suffix.

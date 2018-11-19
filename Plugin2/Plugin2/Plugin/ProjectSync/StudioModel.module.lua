@@ -25,7 +25,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "StudioModel: ", false);
+local Debug = Utils.new("Log", "StudioModel: ", true);
 local Helpers = require(script.Parent.Helpers);
 
 local SUFFIXES = Helpers.SUFFIXES;
@@ -222,18 +222,7 @@ function StudioModel.fromFilesystemModel(fm)
 	local objects = {};
 	local function AddToRoot(path, name, obj)
 		Debug("AddToRoot(%s, %s, %s) called", path, name, obj);
-		local first = string.match(path, "^[^/]+");
-		if first then
-			--make sure the root name matches the first directory.
-			root.Name = first;
-			Helpers.AddToRoot(root, path, name, obj);
-		else
-			--We have a script at top-level, so we should replace `root` with the proper script.
-			for i, v in pairs(root:GetChildren()) do
-				v.Parent = obj;
-			end
-			root = obj;
-		end
+		root = Helpers.AddToRoot(root, path, name, obj);
 	end
 	--Scan through the tree; anything that's a file should be created.
 	local function recurse(tree)
@@ -262,7 +251,11 @@ function StudioModel.fromFilesystemModel(fm)
 end
 
 local function PrintModel(model)
-	local rootName = model.Root:GetFullName();
+	local trimIndex = 1;
+	if model.Root.Parent then
+		trimIndex = #model.Root.Parent:GetFullName() + 2;
+	end
+	Debug("Root: %s (%s)", model.Root:GetFullName(), model.Root.ClassName);
 	local objectsSortedByFullName = {};
 	for i, v in pairs(model.Objects) do
 		table.insert(objectsSortedByFullName, {v.Object:GetFullName(); v});
@@ -270,7 +263,7 @@ local function PrintModel(model)
 	table.sort(objectsSortedByFullName, function(a, b) return a[1] < b[1]; end);
 	for i, v in pairs(objectsSortedByFullName) do
 		local v = v[2];
-		Debug("%s (%s) - %s", string.sub(v.Object:GetFullName(), #rootName + 2), v.Object.ClassName, v.Hash);
+		Debug("%s (%s) - %s", string.sub(v.Object:GetFullName(), trimIndex), v.Object.ClassName, v.Hash);
 	end
 end
 
@@ -299,7 +292,6 @@ local TEST_FOLDER = Utils.Misc.Create(
 function StudioModel.TestManualCompare()
 	local m1 = StudioModel.fromInstance(TEST_FOLDER);
 	local fm = Helpers.BuildFakeFilesystemModel([[
-	Folder/
 		Script.server.lua 22
 		Subfolder.server.lua 22
 		Subfolder/
@@ -316,19 +308,28 @@ function StudioModel.TestManualCompare()
 	m2:Destroy();
 end
 
---[[ @brief Tests that a root script can be converted into a StudioModel from a FilesystemModel.
+--[[ @brief Tests that we can convert from a filesystem model to a studio model if the top-most filesystem element _is_ the top-most studio element.
 --]]
-function StudioModel.TestRootScript()
-	local fm = Helpers.BuildFakeFilesystemModel([[
-		Main.server.lua 5
-		Main/
-			Subscript.server.lua 5
+function StudioModel.TestSingleRootConversion()
+	local fm1 = Helpers.BuildFakeFilesystemModel([[
+		Main.parent.server.lua 5
+		Subscript.server.lua 6
 	]]);
-	local m2 = StudioModel.fromFilesystemModel(fm);
-	Debug("Model 2: ");
+	local fm2 = Helpers.BuildFakeFilesystemModel([[
+		Main.parent.server.lua 5
+		Subscript/
+			Subscript.parent.server.lua 6
+	]]);
+	Debug("Converting Model 1");
+	local m1 = StudioModel.fromFilesystemModel(fm1)
+	Debug("Converting Model 2");
+	local m2 = StudioModel.fromFilesystemModel(fm2)
+	Debug("Model 1:");
+	PrintModel(m1);
+	Debug("Model 2:");
 	PrintModel(m2);
 end
 
-StudioModel.Test = StudioModel.TestRootScript;
+StudioModel.Test = StudioModel.TestManualCompare;
 
 return StudioModel;
