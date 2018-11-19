@@ -23,9 +23,9 @@ local gui = plugin:CreateDockWidgetPluginGui("SyncyTowne2", DockWidgetPluginGuiI
 gui.Title = "SyncyTowne";
 gui.Name = "SyncyTowne";
 
-local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData_Test"));
+local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData"));
 pm.Changed:Connect(function()
-	pm:Save(game.ServerStorage, "SyncyTowneData_Test");
+	pm:Save(game.ServerStorage, "SyncyTowneData");
 end);
 
 local syncGui = SyncGui.new(pm);

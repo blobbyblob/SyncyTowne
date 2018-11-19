@@ -5,7 +5,7 @@ Contains a function to compare a FilesystemModel against a StudioModel.
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "Compare: ", true);
+local Debug = Utils.new("Log", "Compare: ", false);
 local Helpers = require(script.Parent.Helpers);
 local StudioModel = require(script.Parent.StudioModel);
 local ServerRequests = require(script.Parent.Parent.ServerRequests);

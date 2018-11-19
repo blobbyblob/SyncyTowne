@@ -25,7 +25,7 @@ Constructors:
 --]]
 
 local Utils = require(script.Parent.Parent.Parent.Utils);
-local Debug = Utils.new("Log", "StudioModel: ", true);
+local Debug = Utils.new("Log", "StudioModel: ", false);
 local Helpers = require(script.Parent.Helpers);
 
 local SUFFIXES = Helpers.SUFFIXES;
