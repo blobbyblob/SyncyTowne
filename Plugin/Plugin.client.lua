@@ -1,34 +1,63 @@
 --[[
 
-Boots the plugin. To test:
-	local _=(_G.SyncWhole and _G.SyncWhole:DoCleaning()); local m = game.ReplicatedStorage.Plugin:Clone(); local f = assert(loadstring(m.Plugin.Source)); getfenv(f).script = m.Plugin; f();
+The main driver for the plugin. This is the glue that holds everything together.
+
+FilesystemModel: represents the truth of the filesystem.
+StudioModel: represents the truth of studio.
+
+When pulling, FilesystemModel is converted to a StudioModel and they are synced that way. When pushing, the reverse happens. Each model is responsible for doing its own Changed event to watch for changes.
+
+
 
 --]]
 
-local Utils = require(script.Utils);
+--require(script.ProjectSync.Compare).Test();
+--do return; end
+
+local Utils = require(script.Parent.Utils);
+local Debug = Utils.new("Log", "Plugin: ", false);
 local SyncGui = require(script.SyncGui);
-local PluginGetOrCreate = require(script.SyncGui.PluginGetOrCreate);
 local ProjectManager = require(script.ProjectManager);
 
-_G.SyncWhole = Utils.new("Maid");
+local gui = plugin:CreateDockWidgetPluginGui("SyncyTowne2", DockWidgetPluginGuiInfo.new());
+gui.Title = "SyncyTowne";
+gui.Name = "SyncyTowne";
 
---create a new button
-local PGOC = PluginGetOrCreate.new(
-	"SyncyTowne",
-	{},
-	{
-		{ Name = "SyncyTowne"; Title = "Welcome aboard the HMS SyncyTowne!"};
-	}
-);
-local gui = PGOC.Gui;
-local syncGui = SyncGui.new();
-syncGui.Parent = gui;
-
---Load the projects from game.ServerStorage.SyncyTowneData
-local pm = ProjectManager.Load();
-_G.SyncWhole.PM = pm;
+local pm = ProjectManager.Load(game.ServerStorage:FindFirstChild("SyncyTowneData_Test"));
 pm.Changed:Connect(function()
-	pm:Save();
-end)
+	pm:Save(game.ServerStorage, "SyncyTowneData_Test");
+end);
 
-syncGui.ProjectManager = pm;
+local syncGui = SyncGui.new(pm);
+syncGui.Frame.Parent = gui;
+syncGui.RefreshCallback = function(project)
+	Debug("RefreshCallback(%s) called", project);
+	if project then
+		project.ProjectSync:CheckSync();
+	else
+		for i, project in pairs(pm.Projects) do
+			project.ProjectSync:CheckSync();
+		end
+	end
+end;
+syncGui.SyncCallback = function(mode, project, script)
+	Debug("SyncCallback(%s, %s, %s) called", mode, project, script);
+	if mode == "sync" then
+		project.ProjectSync:SetAutoSync(script);
+	elseif mode == "pull" then
+		project.ProjectSync:Pull(script);
+	elseif mode == "push" then
+		project.ProjectSync:Push(script);
+	end
+end;
+syncGui.DeleteCallback = function(project)
+	Debug("DeleteCallback(%s) called", project);
+	for i, v in pairs(pm.Projects) do
+		if v == project then
+			table.remove(pm.Projects, i);
+			break;
+		end
+	end
+	project.ProjectSync:Destroy();
+	pm.Projects = pm.Projects;
+end;
